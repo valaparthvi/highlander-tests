@@ -1,20 +1,20 @@
-package gke_test
+package eks_test
 
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
-	"github.com/rancher/rancher/tests/framework/extensions/clusters/gke"
+	"github.com/rancher/rancher/tests/framework/extensions/clusters/eks"
 	nodestat "github.com/rancher/rancher/tests/framework/extensions/nodes"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
-	"github.com/valaparthvi/highlander-tests/hosted/gke/helper"
+	"github.com/valaparthvi/highlander-tests/hosted/eks/helper"
 )
 
-var _ = Describe("ProvisioningGke", func() {
+var _ = Describe("ProvisioningEks", func() {
 	var (
-		clusterName = namegen.AppendRandomString("gkehostcluster")
+		clusterName = namegen.AppendRandomString("ekshostcluster")
 		ctx         helper.Context
 	)
 	var _ = BeforeEach(func() {
@@ -29,7 +29,7 @@ var _ = Describe("ProvisioningGke", func() {
 
 		BeforeEach(func() {
 			var err error
-			cluster, err = gke.CreateGKEHostedCluster(ctx.RancherClient, clusterName, ctx.CloudCred.ID, false, false, false, false, map[string]string{})
+			cluster, err = eks.CreateEKSHostedCluster(ctx.RancherClient, clusterName, ctx.CloudCred.ID, false, false, false, false, map[string]string{})
 			Expect(err).To(BeNil())
 			helper.WaitUntilClusterIsReady(cluster, ctx.RancherClient)
 		})
@@ -62,6 +62,7 @@ var _ = Describe("ProvisioningGke", func() {
 			})
 		})
 		When("the cluster is upgraded", func() {
+
 		})
 	})
 

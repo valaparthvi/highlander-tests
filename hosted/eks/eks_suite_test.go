@@ -1,4 +1,4 @@
-package ginkgo_gke_test
+package eks_test
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestGinkgoGke(t *testing.T) {
+func TestEks(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "GinkgoGke Suite")
+	RunSpecs(t, "Eks Suite")
 }
