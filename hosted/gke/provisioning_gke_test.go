@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	"github.com/valaparthvi/highlander-tests/hosted/gke/helper"
+	"k8s.io/utils/pointer"
 )
 
 var _ = Describe("ProvisioningGke", func() {
@@ -38,7 +39,7 @@ var _ = Describe("ProvisioningGke", func() {
 		//	Expect(err).To(BeNil())
 		//})
 
-		It("should successfully provision the cluster", func() {
+		FIt("should successfully provision the cluster", func() {
 
 			By("checking cluster name is same", func() {
 				Expect(cluster.Name).To(BeEquivalentTo(clusterName))
@@ -61,8 +62,18 @@ var _ = Describe("ProvisioningGke", func() {
 				Expect(podResults).ToNot(BeEmpty())
 			})
 		})
+
 		When("the cluster is upgraded", func() {
-			
+			var version = pointer.String("1.27.4-gke.900")
+			BeforeEach(func() {
+				cluster, err := helper.UpgradeKubernetesVersion(cluster, version, ctx.RancherClient)
+				Expect(err).To(BeNil())
+				err = clusters.WaitClusterToBeUpgraded(ctx.RancherClient, cluster.ID)
+				Expect(err).To(BeNil())
+			})
+			It("should have upgraded the cluster's kubernetes version", func() {
+				Expect(cluster.GKEConfig.KubernetesVersion).To(BeEquivalentTo(version))
+			})
 		})
 	})
 
