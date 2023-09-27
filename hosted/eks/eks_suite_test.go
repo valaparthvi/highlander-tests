@@ -1,4 +1,4 @@
-package eks_test
+package eks
 
 import (
 	"testing"
