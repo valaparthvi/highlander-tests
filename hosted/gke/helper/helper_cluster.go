@@ -26,13 +26,15 @@ func WaitUntilClusterIsReady(cluster *management.Cluster, client *rancher.Client
 	Expect(err).To(BeNil())
 }
 
-func UpgradeKubernetesVersion(cluster *management.Cluster, upgradeToVersion *string, client *rancher.Client) (*management.Cluster, error) {
+func UpgradeKubernetesVersion(cluster *management.Cluster, upgradeToVersion *string, client *rancher.Client, upgradeNodePool bool) (*management.Cluster, error) {
 	upgradedCluster := new(management.Cluster)
 	upgradedCluster.Name = cluster.Name
 	upgradedCluster.GKEConfig = cluster.GKEConfig
 	upgradedCluster.GKEConfig.KubernetesVersion = upgradeToVersion
-	for i := range upgradedCluster.GKEConfig.NodePools {
-		upgradedCluster.GKEConfig.NodePools[i].Version = upgradeToVersion
+	if upgradeNodePool {
+		for i := range upgradedCluster.GKEConfig.NodePools {
+			upgradedCluster.GKEConfig.NodePools[i].Version = upgradeToVersion
+		}
 	}
 
 	cluster, err := client.Management.Cluster.Update(cluster, &upgradedCluster)
@@ -41,20 +43,6 @@ func UpgradeKubernetesVersion(cluster *management.Cluster, upgradeToVersion *str
 	}
 	return cluster, nil
 }
-
-//func UpgradeNodePoolKubernetesVersion(cluster *management.Cluster, upgradeToVersion *string, client *rancher.Client) (*management.Cluster, error) {
-//	upgradedCluster := new(management.Cluster)
-//	upgradedCluster.Name = cluster.Name
-//	upgradedCluster.GKEConfig = cluster.GKEConfig
-//	for i := range upgradedCluster.GKEConfig.NodePools {
-//		upgradedCluster.GKEConfig.NodePools[i].Version = upgradeToVersion
-//	}
-//	cluster, err := client.Management.Cluster.Update(cluster, &upgradedCluster)
-//	if err != nil {
-//		return nil, err
-//	}
-//	return cluster, nil
-//}
 
 func DeleteGKEHostCluster(cluster *management.Cluster, client *rancher.Client) error {
 	return client.Management.Cluster.Delete(cluster)
@@ -92,6 +80,21 @@ func DeleteNodePool(cluster *management.Cluster, client *rancher.Client) (*manag
 	upgradedCluster.GKEConfig = cluster.GKEConfig
 
 	upgradedCluster.GKEConfig.NodePools = cluster.GKEConfig.NodePools[1:]
+
+	cluster, err := client.Management.Cluster.Update(cluster, &upgradedCluster)
+	if err != nil {
+		return nil, err
+	}
+	return cluster, nil
+}
+
+func ScaleNodePool(cluster *management.Cluster, client *rancher.Client, nodeCount int64) (*management.Cluster, error) {
+	upgradedCluster := new(management.Cluster)
+	upgradedCluster.Name = cluster.Name
+	upgradedCluster.GKEConfig = cluster.GKEConfig
+	for i := range upgradedCluster.GKEConfig.NodePools {
+		upgradedCluster.GKEConfig.NodePools[i].InitialNodeCount = pointer.Int64(nodeCount)
+	}
 
 	cluster, err := client.Management.Cluster.Update(cluster, &upgradedCluster)
 	if err != nil {
