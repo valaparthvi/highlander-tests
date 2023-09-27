@@ -1,20 +1,22 @@
-package eks
+package aks
 
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
-	"github.com/rancher/rancher/tests/framework/extensions/clusters/eks"
+	"github.com/rancher/rancher/tests/framework/extensions/clusters/aks"
 	nodestat "github.com/rancher/rancher/tests/framework/extensions/nodes"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
+	"github.com/rancher/rancher/tests/framework/pkg/config"
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
-	"github.com/valaparthvi/highlander-tests/hosted/eks/helper"
+	"github.com/valaparthvi/highlander-tests/hosted/aks/helper"
 )
 
-var _ = Describe("ProvisioningEks", func() {
+var _ = Describe("ProvisioningAks", func() {
 	var (
-		clusterName = namegen.AppendRandomString("ekshostcluster")
+		clusterName = namegen.AppendRandomString("akshostcluster")
+		dnsPrefix   = clusterName + "-dns"
 		ctx         helper.Context
 	)
 	var _ = BeforeEach(func() {
@@ -29,7 +31,14 @@ var _ = Describe("ProvisioningEks", func() {
 
 		BeforeEach(func() {
 			var err error
-			cluster, err = eks.CreateEKSHostedCluster(ctx.RancherClient, clusterName, ctx.CloudCred.ID, false, false, false, false, map[string]string{})
+
+			aksConfig := new(aks.ClusterConfig)
+			config.LoadAndUpdateConfig(aks.AKSClusterConfigConfigurationFileKey, aksConfig, func() {
+				aksConfig.ResourceGroup = clusterName
+				aksConfig.DNSPrefix = &dnsPrefix
+			})
+
+			cluster, err = aks.CreateAKSHostedCluster(ctx.RancherClient, clusterName, ctx.CloudCred.ID, false, false, false, false, map[string]string{})
 			Expect(err).To(BeNil())
 			helper.WaitUntilClusterIsReady(cluster, ctx.RancherClient)
 		})

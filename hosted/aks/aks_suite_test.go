@@ -1,4 +1,4 @@
-package gke
+package aks
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestGke(t *testing.T) {
+func TestAks(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Gke Suite")
+	RunSpecs(t, "Aks Suite")
 }

@@ -1,4 +1,4 @@
-package gke_test
+package gke
 
 import (
 	. "github.com/onsi/ginkgo/v2"
