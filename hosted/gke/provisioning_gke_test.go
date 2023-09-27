@@ -15,10 +15,11 @@ import (
 
 var _ = Describe("ProvisioningGke", func() {
 	var (
-		clusterName = namegen.AppendRandomString("gkehostcluster")
+		clusterName string
 		ctx         helper.Context
 	)
 	var _ = BeforeEach(func() {
+		clusterName = namegen.AppendRandomString("gkehostcluster")
 		ctx = helper.CommonBeforeEach(helper.ContextOpts{})
 	})
 
@@ -30,6 +31,8 @@ var _ = Describe("ProvisioningGke", func() {
 
 		BeforeEach(func() {
 			var err error
+			//TODO: Create GKE cluster only once
+			//TODO(contd.): Currently a new GKE cluster is created for every new test, this significantly increases the test time for the entire suite by 6x (it takes 6 minutes for a cluster to be setup)
 			cluster, err = gke.CreateGKEHostedCluster(ctx.RancherClient, clusterName, ctx.CloudCred.ID, false, false, false, false, map[string]string{})
 			Expect(err).To(BeNil())
 			helper.WaitUntilClusterIsReady(cluster, ctx.RancherClient)
@@ -62,16 +65,65 @@ var _ = Describe("ProvisioningGke", func() {
 				Expect(podResults).ToNot(BeEmpty())
 			})
 		})
-		When("the k8s version of the cluster is upgraded", func() {
+		Context("Upgrading K8s version", func() {
+			// TODO: Programmatically obtain the the version
 			var version = pointer.String("1.27.4-gke.900")
-			BeforeEach(func() {
-				cluster, err := helper.UpgradeKubernetesVersion(cluster, version, ctx.RancherClient)
-				Expect(err).To(BeNil())
-				err = clusters.WaitClusterToBeUpgraded(ctx.RancherClient, cluster.ID)
-				Expect(err).To(BeNil())
+			When("the k8s version of the cluster is upgraded", func() {
+				BeforeEach(func() {
+					cluster, err := helper.UpgradeKubernetesVersion(cluster, version, ctx.RancherClient)
+					Expect(err).To(BeNil())
+					err = clusters.WaitClusterToBeUpgraded(ctx.RancherClient, cluster.ID)
+					Expect(err).To(BeNil())
+				})
+				It("should have upgraded the cluster's kubernetes version", func() {
+					Expect(cluster.GKEConfig.KubernetesVersion).To(BeEquivalentTo(version))
+					for _, np := range cluster.GKEConfig.NodePools {
+						Expect(np.Version).To(BeEquivalentTo(version))
+					}
+				})
 			})
-			It("should have upgraded the cluster's kubernetes version", func() {
-				Expect(cluster.GKEConfig.KubernetesVersion).To(BeEquivalentTo(version))
+			//When("the k8s version of nodepools is upgraded", func() {
+			//	BeforeEach(func() {
+			//		cluster, err := helper.UpgradeNodePoolKubernetesVersion(cluster, version, ctx.RancherClient)
+			//		Expect(err).To(BeNil())
+			//		err = clusters.WaitClusterToBeUpgraded(ctx.RancherClient, cluster.ID)
+			//		Expect(err).To(BeNil())
+			//	})
+			//	It("should have upgraded the nodepools' kubernetes version", func() {
+			//		for _, np := range cluster.GKEConfig.NodePools {
+			//			Expect(np.Version).To(BeEquivalentTo(version))
+			//		}
+			//	})
+			//})
+
+		})
+		Context("Scaling NodePools", func() {
+			var currentNodePoolNumber int
+			BeforeEach(func() {
+				currentNodePoolNumber = len(cluster.GKEConfig.NodePools)
+			})
+
+			When("a nodepool is added", func() {
+				BeforeEach(func() {
+					cluster, err := helper.AddNodePool(cluster, ctx.RancherClient)
+					Expect(err).To(BeNil())
+					err = clusters.WaitClusterToBeUpgraded(ctx.RancherClient, cluster.ID)
+					Expect(err).To(BeNil())
+				})
+				It("should have successfully increased the node pool qty", func() {
+					Expect(len(cluster.GKEConfig.NodePools)).To(BeNumerically(">", currentNodePoolNumber))
+				})
+			})
+			When("a nodepool is deleted", func() {
+				BeforeEach(func() {
+					cluster, err := helper.DeleteNodePool(cluster, ctx.RancherClient)
+					Expect(err).To(BeNil())
+					err = clusters.WaitClusterToBeUpgraded(ctx.RancherClient, cluster.ID)
+					Expect(err).To(BeNil())
+				})
+				It("should have successfully reduced the node pool qty", func() {
+					Expect(len(cluster.GKEConfig.NodePools)).To(BeNumerically("<", currentNodePoolNumber))
+				})
 			})
 		})
 	})
