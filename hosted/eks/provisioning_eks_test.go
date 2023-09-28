@@ -24,6 +24,7 @@ var _ = Describe("ProvisioningEks", func() {
 	var _ = AfterEach(func() {
 		helper.CommonAfterEach(ctx)
 	})
+
 	When("a cluster is created", func() {
 		var cluster *management.Cluster
 
