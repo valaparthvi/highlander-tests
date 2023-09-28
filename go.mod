@@ -6,6 +6,7 @@ require (
 	github.com/rancher/rancher v0.0.0-20230925082438-a4eae8069b62
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.8.4
+	k8s.io/utils v0.0.0-20230505201702-9f6742963106
 )
 
 require (
@@ -83,7 +84,6 @@ require (
 	k8s.io/kube-aggregator v0.27.4 // indirect
 	k8s.io/kube-openapi v0.0.0-20230530175149-33f04d5d6b58 // indirect
 	k8s.io/kubernetes v1.27.4 // indirect
-	k8s.io/utils v0.0.0-20230505201702-9f6742963106 // indirect
 	sigs.k8s.io/cli-utils v0.27.0 // indirect
 	sigs.k8s.io/cluster-api v1.5.0 // indirect
 	sigs.k8s.io/controller-runtime v0.15.1 // indirect
