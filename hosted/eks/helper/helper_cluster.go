@@ -76,7 +76,7 @@ func AddNodeGroup(cluster *management.Cluster, client *rancher.Client) (*managem
 		InstanceType:  existingNodeGroup.InstanceType,
 		MaxSize:       existingNodeGroup.MaxSize,
 		MinSize:       existingNodeGroup.MinSize,
-		NodegroupName: pointer.String(namegen.AppendRandomString("NodegroupName")),
+		NodegroupName: pointer.String(namegen.AppendRandomString("nodegroup")),
 		Version:       existingNodeGroup.Version,
 	}
 	upgradedCluster.EKSConfig.NodeGroups = append(upgradedCluster.EKSConfig.NodeGroups, newNodeGroup)
