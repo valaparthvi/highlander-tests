@@ -14,32 +14,18 @@ type Context struct {
 	Session       *session.Session
 }
 
-// ContextOpts is set of options that can be set while creating a Context
-type ContextOpts struct {
-	// NoCreateCred if set to true, will not create cloud credentials
-	NoCreateCred bool
-}
-
-func CommonBeforeEach(ctxopt ContextOpts) Context {
+func CommonBeforeSuite() Context {
 	testSession := session.NewSession()
 
 	rancherClient, err := rancher.NewClient("", testSession)
 	Expect(err).To(BeNil())
 
-	var cloudCredential *cloudcredentials.CloudCredential
-	if !ctxopt.NoCreateCred {
-		cloudCredential, err = azure.CreateAzureCloudCredentials(rancherClient)
-		Expect(err).To(BeNil())
-	}
+	cloudCredential, err := azure.CreateAzureCloudCredentials(rancherClient)
+	Expect(err).To(BeNil())
 
 	return Context{
 		CloudCred:     cloudCredential,
 		RancherClient: rancherClient,
 		Session:       testSession,
 	}
-}
-
-func CommonAfterEach(ctx Context) {
-	//	Delete created cloud creds
-	//	Delete created cluster
 }

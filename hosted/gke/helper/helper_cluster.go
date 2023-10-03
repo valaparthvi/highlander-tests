@@ -1,6 +1,7 @@
 package helper
 
 import (
+	"github.com/Masterminds/semver/v3"
 	. "github.com/onsi/gomega"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
@@ -115,4 +116,21 @@ func ListGKEAvailableVersions(client *rancher.Client, clusterID string) (availab
 		return nil, err
 	}
 	return kubernetesversions.ListGKEAvailableVersions(client, cluster)
+}
+
+func ListSingleVariantGKEAvailableVersions(client *rancher.Client, projectID, cloudCredentialID, zone, region string) (availableVersions []string, err error) {
+	availableVersions, err = kubernetesversions.ListGKEAllVersions(client, projectID, cloudCredentialID, zone, region)
+	if err != nil {
+		return nil, err
+	}
+	var singleVersionList []string
+	var oldMinor uint64
+	for _, version := range availableVersions {
+		semVersion := semver.MustParse(version)
+		if currentMinor := semVersion.Minor(); oldMinor != currentMinor {
+			singleVersionList = append(singleVersionList, version)
+			oldMinor = currentMinor
+		}
+	}
+	return singleVersionList, nil
 }

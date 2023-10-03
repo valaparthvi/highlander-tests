@@ -20,12 +20,9 @@ var _ = Describe("ProvisioningAks", func() {
 		ctx         helper.Context
 	)
 	var _ = BeforeEach(func() {
-		ctx = helper.CommonBeforeEach(helper.ContextOpts{})
+		ctx = helper.CommonBeforeSuite()
 	})
 
-	var _ = AfterEach(func() {
-		helper.CommonAfterEach(ctx)
-	})
 	When("a cluster is created", func() {
 		var cluster *management.Cluster
 
