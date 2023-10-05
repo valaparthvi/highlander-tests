@@ -2,6 +2,7 @@ package support_matrix_test
 
 import (
 	"fmt"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
@@ -12,6 +13,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/provisioninginput"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
+
 	"github.com/valaparthvi/highlander-tests/hosted/eks/helper"
 )
 

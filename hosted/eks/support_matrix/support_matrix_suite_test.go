@@ -1,8 +1,11 @@
 package support_matrix_test
 
 import (
-	"github.com/valaparthvi/highlander-tests/hosted/eks/helper"
 	"testing"
+
+	"github.com/rancher/rancher/tests/framework/extensions/clusters/kubernetesversions"
+
+	"github.com/valaparthvi/highlander-tests/hosted/eks/helper"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -18,7 +21,8 @@ func TestSupportMatrix(t *testing.T) {
 	ctx = helper.CommonBeforeSuite()
 
 	var err error
-	availableVersionList, err = helper.ListSingleVariantEKSAvailableVersions(ctx.RancherClient)
+	availableVersionList, err = kubernetesversions.ListEKSAllVersions(ctx.RancherClient)
 	Expect(err).To(BeNil())
+	Expect(availableVersionList).ToNot(BeEmpty())
 	RunSpecs(t, "SupportMatrix Suite")
 }
