@@ -22,3 +22,8 @@ func WaitUntilClusterIsReady(cluster *client.Cluster, client *rancher.Client) {
 	err = wait.WatchWait(watchInterface, watchFunc)
 	Expect(err).To(BeNil())
 }
+
+// DeleteEKSHostCluster deletes the EKS cluster
+func DeleteEKSHostCluster(cluster *management.Cluster, client *rancher.Client) error {
+	return client.Management.Cluster.Delete(cluster)
+}

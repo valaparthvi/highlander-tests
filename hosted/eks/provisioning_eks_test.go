@@ -18,11 +18,7 @@ var _ = Describe("ProvisioningEks", func() {
 		ctx         helper.Context
 	)
 	var _ = BeforeEach(func() {
-		ctx = helper.CommonBeforeEach(helper.ContextOpts{})
-	})
-
-	var _ = AfterEach(func() {
-		helper.CommonAfterEach(ctx)
+		ctx = helper.CommonBeforeSuite()
 	})
 
 	When("a cluster is created", func() {
