@@ -20,12 +20,9 @@ var _ = Describe("ProvisioningGke", func() {
 	)
 	var _ = BeforeEach(func() {
 		clusterName = namegen.AppendRandomString("gkehostcluster")
-		ctx = helper.CommonBeforeEach(helper.ContextOpts{})
+		ctx = helper.CommonBeforeSuite()
 	})
 
-	var _ = AfterEach(func() {
-		helper.CommonAfterEach(ctx)
-	})
 	When("a cluster is created", func() {
 		var cluster *management.Cluster
 

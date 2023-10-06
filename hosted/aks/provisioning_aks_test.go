@@ -21,7 +21,7 @@ var (
 )
 
 var _ = BeforeSuite(func() {
-	ctx = helper.CommonBeforeEach(helper.ContextOpts{})
+	ctx = helper.CommonBeforeSuite()
 })
 
 var _ = AfterSuite(func() {
@@ -29,18 +29,24 @@ var _ = AfterSuite(func() {
 	Expect(err).To(BeNil())
 })
 
-var _ = Describe("ProvisioningAks", func() {
+var _ = Describe("ProvisioningAks", Ordered, func() {
 
 	When("a cluster is created", func() {
-		It("should successfully provision the cluster", func() {
-
-			By("provisioning the cluster", func() {
-				var err error
-				cluster, err = aks.CreateAKSHostedCluster(ctx.RancherClient, clusterName, ctx.CloudCred.ID, false, false, false, false, map[string]string{})
-				Expect(err).To(BeNil())
-				helper.WaitUntilClusterIsReady(cluster, ctx.RancherClient)
+		BeforeAll(func() {
+			dnsPrefix := clusterName + "-dns"
+			aksConfig := new(aks.ClusterConfig)
+			config.LoadAndUpdateConfig(aks.AKSClusterConfigConfigurationFileKey, aksConfig, func() {
+				aksConfig.ResourceGroup = clusterName
+				aksConfig.DNSPrefix = &dnsPrefix
 			})
+			// Provisioning the cluster.
+			var err error
+			cluster, err = aks.CreateAKSHostedCluster(ctx.RancherClient, clusterName, ctx.CloudCred.ID, false, false, false, false, map[string]string{})
+			Expect(err).To(BeNil())
+			helper.WaitUntilClusterIsReady(cluster, ctx.RancherClient)
+		})
 
+		It("should successfully provision the cluster", func() {
 			By("checking cluster name is same", func() {
 				Expect(cluster.Name).To(BeEquivalentTo(clusterName))
 			})
