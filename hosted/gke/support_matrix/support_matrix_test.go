@@ -20,6 +20,7 @@ var _ = Describe("SupportMatrix", func() {
 	for _, version := range availableVersionList {
 		version := version
 
+		//TODO: Find another way to show the version being tested instead of using dynamic values for test name
 		When(fmt.Sprintf("a cluster is created with k8s version %s", version), func() {
 			var (
 				clusterName string

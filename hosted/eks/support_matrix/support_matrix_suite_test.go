@@ -25,4 +25,5 @@ func TestSupportMatrix(t *testing.T) {
 	Expect(err).To(BeNil())
 	Expect(availableVersionList).ToNot(BeEmpty())
 	RunSpecs(t, "SupportMatrix Suite")
+	//	TODO: AfterSuite restore the config to what it was previously
 }
