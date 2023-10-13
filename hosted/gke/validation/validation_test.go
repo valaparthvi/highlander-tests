@@ -1,4 +1,4 @@
-package provisioning_test
+package validation_test
 
 import (
 	. "github.com/onsi/ginkgo/v2"
@@ -14,7 +14,7 @@ import (
 	"github.com/valaparthvi/highlander-tests/hosted/gke/helper"
 )
 
-var _ = Describe("Provisioning", func() {
+var _ = Describe("Validation", func() {
 	It("should be able to create the cluster, successfully provision it and then delete it", func() {
 		clusterName := namegen.AppendRandomString("gkehostcluster")
 		var cluster *management.Cluster
@@ -51,7 +51,19 @@ var _ = Describe("Provisioning", func() {
 			err := helper.DeleteGKEHostCluster(cluster, ctx.RancherClient)
 			Expect(err).To(BeNil())
 		})
+
+		By("ensuring the cluster does not exist in rancher", func() {
+			//TODO: test this
+			_, err := ctx.RancherClient.Management.Cluster.ByID(cluster.ID)
+			Expect(err).ToNot(BeNil())
+		})
+
+		By("ensuring the cluster does not exist on gcloud", func() {
+			clusterExists := helper.CheckGKEClusterExistsUsingGCloud(clusterName, cluster.GKEConfig.Zone, cluster.GKEConfig.ProjectID)
+			Expect(clusterExists).To(BeFalse())
+		})
 	})
+
 	Context("Importing a Cluster", func() {
 		var (
 			clusterName string
@@ -106,6 +118,17 @@ var _ = Describe("Provisioning", func() {
 			By("deleting the cluster", func() {
 				err := helper.DeleteGKEHostCluster(cluster, ctx.RancherClient)
 				Expect(err).To(BeNil())
+			})
+
+			By("ensuring the cluster does not exist in rancher", func() {
+				//TODO: test this
+				_, err := ctx.RancherClient.Management.Cluster.ByID(cluster.ID)
+				Expect(err).ToNot(BeNil())
+			})
+
+			By("ensuring the cluster still exists on gcloud", func() {
+				clusterExists := helper.CheckGKEClusterExistsUsingGCloud(clusterName, cluster.GKEConfig.Zone, cluster.GKEConfig.ProjectID)
+				Expect(clusterExists).To(BeTrue())
 			})
 		})
 	})

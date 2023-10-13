@@ -29,3 +29,10 @@ func CommonBeforeSuite() Context {
 		Session:       testSession,
 	}
 }
+
+func CommonAfterSuite(ctx Context) {
+	cloudCred, err := ctx.RancherClient.Management.CloudCredential.ByID(ctx.CloudCred.ID)
+	Expect(err).To(BeNil())
+	err = ctx.RancherClient.Management.CloudCredential.Delete(cloudCred)
+	Expect(err).To(BeNil())
+}

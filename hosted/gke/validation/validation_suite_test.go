@@ -1,4 +1,4 @@
-package provisioning_test
+package validation_test
 
 import (
 	"testing"
@@ -11,8 +11,8 @@ import (
 
 var ctx helper.Context
 
-func TestProvisioning(t *testing.T) {
+func TestValidation(t *testing.T) {
 	RegisterFailHandler(Fail)
 	ctx = helper.CommonBeforeSuite()
-	RunSpecs(t, "Provisioning Suite")
+	RunSpecs(t, "Validation Suite")
 }

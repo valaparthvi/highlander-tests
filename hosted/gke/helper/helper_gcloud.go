@@ -1,6 +1,7 @@
 package helper
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"strings"
@@ -65,4 +66,17 @@ func DeleteGKEClusterUsingGCloud(clusterName, location, project string, wait boo
 		return err
 	}
 	return nil
+}
+
+func CheckGKEClusterExistsUsingGCloud(clusterName, location, project string) bool {
+	args := []string{"container", "clusters", "list", "--filter", fmt.Sprintf("%v AND status:RUNNING", clusterName), "--location", location, "--project", project, "--quiet"}
+	cmd := exec.Command("gcloud", args...)
+	out, err := cmd.Output()
+	if err != nil {
+		return false
+	}
+	if strings.Contains(string(out), clusterName) {
+		return true
+	}
+	return false
 }

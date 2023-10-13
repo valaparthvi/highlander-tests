@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	"github.com/valaparthvi/highlander-tests/hosted/gke/helper"
+	"os"
 )
 
 var _ = Describe("SupportMatrix", func() {
@@ -25,19 +26,30 @@ var _ = Describe("SupportMatrix", func() {
 			var (
 				clusterName string
 				cluster     *management.Cluster
+				configData  []byte
+				configPath  = os.Getenv("CATTLE_TEST_CONFIG")
 			)
 			BeforeEach(func() {
-				clusterName = namegen.AppendRandomString("gkehostcluster")
-				pipeline.UpdateHostedKubernetesVField(provisioninginput.GoogleProviderName.String(), version)
 				var err error
+				configData, err = os.ReadFile(configPath)
+				Expect(err).To(BeNil())
+
+				pipeline.UpdateHostedKubernetesVField(provisioninginput.GoogleProviderName.String(), version)
+
+				clusterName = namegen.AppendRandomString("gkehostcluster")
 				cluster, err = gke.CreateGKEHostedCluster(ctx.RancherClient, clusterName, ctx.CloudCred.ID, false, false, false, false, map[string]string{})
 				Expect(err).To(BeNil())
 				helper.WaitUntilClusterIsReady(cluster, ctx.RancherClient)
 			})
+
 			AfterEach(func() {
 				err := helper.DeleteGKEHostCluster(cluster, ctx.RancherClient)
 				Expect(err).To(BeNil())
+
+				err = os.WriteFile(configPath, configData, 0644)
+				Expect(err).To(BeNil())
 			})
+
 			It("should successfully provision the cluster", func() {
 				By("checking cluster name is same", func() {
 					Expect(cluster.Name).To(BeEquivalentTo(clusterName))
