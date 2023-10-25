@@ -38,6 +38,7 @@ var _ = Describe("P0", func() {
 			helper.WaitUntilClusterIsReady(cluster, ctx.RancherClient)
 		})
 		AfterEach(func() {
+			//TODO: Determine why the clusters are not deleted. None of the clusters were deleted during a test run.
 			err := helper.DeleteGKEHostCluster(cluster, ctx.RancherClient)
 			Expect(err).To(BeNil())
 		})

@@ -37,6 +37,8 @@ func UpgradeKubernetesVersion(cluster *management.Cluster, upgradeToVersion *str
 	upgradedCluster.Name = cluster.Name
 	upgradedCluster.GKEConfig = cluster.GKEConfig
 	upgradedCluster.GKEConfig.KubernetesVersion = upgradeToVersion
+
+	//TODO: if upgradeNodePool is false, autoUpgrade param of the nodepool config must be set to false
 	if upgradeNodePool {
 		for i := range upgradedCluster.GKEConfig.NodePools {
 			upgradedCluster.GKEConfig.NodePools[i].Version = upgradeToVersion
@@ -140,6 +142,7 @@ func ListSingleVariantGKEAvailableVersions(client *rancher.Client, projectID, cl
 	return singleVersionList, nil
 }
 
+// TODO: Fix this; it does not properly import the cluster; imported cluster has GKEConfig missing and other imp details from GKEStatus
 func ImportCluster(client *rancher.Client, name string, restConfig *rest.Config) (*management.Cluster, error) {
 	const fleetDefaultNS = "fleet-default"
 	cluster := v1.Cluster{

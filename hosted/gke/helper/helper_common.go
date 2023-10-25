@@ -22,6 +22,14 @@ func CommonBeforeSuite() Context {
 
 	cloudCredential, err := google.CreateGoogleCloudCredentials(rancherClient)
 	Expect(err).To(BeNil())
+	//token, err := rancherClient.Management.Token.Create(&management.Token{
+	//	AuthProvider: "local",
+	//	Current:      false,
+	//	Description:  "Token for automation tests",
+	//	Enabled:      pointer.Bool(true),
+	//	Name:         "tests",
+	//})
+	//Expect(err).To(BeNil())
 
 	return Context{
 		CloudCred:     cloudCredential,

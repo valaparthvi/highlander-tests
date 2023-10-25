@@ -15,28 +15,29 @@ import (
 )
 
 var (
-	clusterName = namegen.AppendRandomString("ekshostcluster")
-	ctx         helper.Context
-	cluster     *management.Cluster
+	ctx helper.Context
 )
 
 var _ = BeforeSuite(func() {
 	ctx = helper.CommonBeforeSuite()
 })
 
-var _ = AfterSuite(func() {
-	err := helper.DeleteEKSHostCluster(cluster, ctx.RancherClient)
-	Expect(err).To(BeNil())
-})
-
 var _ = Describe("ProvisioningEks", Ordered, func() {
-
 	When("a cluster is created", func() {
-		BeforeAll(func() {
+		var (
+			cluster     *management.Cluster
+			clusterName string
+		)
+		BeforeEach(func() {
 			var err error
+			clusterName = namegen.AppendRandomString("ekshostcluster")
 			cluster, err = eks.CreateEKSHostedCluster(ctx.RancherClient, clusterName, ctx.CloudCred.ID, false, false, false, false, map[string]string{})
 			Expect(err).To(BeNil())
 			helper.WaitUntilClusterIsReady(cluster, ctx.RancherClient)
+		})
+		AfterEach(func() {
+			err := helper.DeleteEKSHostCluster(cluster, ctx.RancherClient)
+			Expect(err).To(BeNil())
 		})
 
 		It("should successfully provision the cluster", func() {

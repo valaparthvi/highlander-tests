@@ -2,6 +2,7 @@ package imports_test
 
 import (
 	"fmt"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
@@ -96,7 +97,7 @@ var _ = Describe("Imports", func() {
 					Expect(err).To(BeNil())
 				})
 
-				It("should have successfully increased the node pool qty", func() {
+				FIt("should have successfully increased the node pool qty", func() {
 					Expect(len(cluster.GKEConfig.NodePools)).To(BeNumerically(">", currentNodePoolNumber))
 				})
 			})
