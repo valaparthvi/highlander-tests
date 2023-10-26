@@ -3,13 +3,11 @@ package helper
 import (
 	"github.com/Masterminds/semver/v3"
 
-	. "github.com/onsi/gomega"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters/kubernetesversions"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	client "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	"github.com/rancher/rancher/tests/framework/extensions/defaults"
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
@@ -17,15 +15,23 @@ import (
 	"k8s.io/utils/pointer"
 )
 
-func WaitUntilClusterIsReady(cluster *client.Cluster, client *rancher.Client) {
+// WaitUntilClusterIsReady waits until the cluster is in a Ready state,
+// fetch the cluster again once it's ready so that it has everything up to date and then return it.
+// For e.g. once the cluster has been updated, it contains information such as Version.GitVersion which it does not have before it's ready
+func WaitUntilClusterIsReady(cluster *management.Cluster, client *rancher.Client) (*management.Cluster, error) {
 	opts := metav1.ListOptions{FieldSelector: "metadata.name=" + cluster.ID, TimeoutSeconds: &defaults.WatchTimeoutSeconds}
 	watchInterface, err := client.GetManagementWatchInterface(management.ClusterType, opts)
-	Expect(err).To(BeNil())
-
+	if err != nil {
+		return nil, err
+	}
 	watchFunc := clusters.IsHostedProvisioningClusterReady
 
 	err = wait.WatchWait(watchInterface, watchFunc)
-	Expect(err).To(BeNil())
+	if err != nil {
+		return nil, err
+	}
+	return client.Management.Cluster.ByID(cluster.ID)
+
 }
 
 // UpgradeClusterKubernetesVersion upgrades the k8s version to the value defined by upgradeToVersion.
@@ -64,7 +70,7 @@ func DeleteAKSHostCluster(cluster *management.Cluster, client *rancher.Client) e
 }
 
 func ListSingleVariantAKSAvailableVersions(client *rancher.Client, cloudCredentialID, region string) (availableVersions []string, err error) {
-	//TODO: passing a cluster is a temporary workaround until https://github.com/rancher/rancher/pull/43034 is merged
+	// TODO: passing a cluster is a temporary workaround until https://github.com/rancher/rancher/pull/43034 is merged
 	cluster := &management.Cluster{AKSConfig: &management.AKSClusterConfigSpec{AzureCredentialSecret: cloudCredentialID, ResourceLocation: region}}
 	availableVersions, err = kubernetesversions.ListAKSAllVersions(client, cluster)
 	if err != nil {
@@ -82,9 +88,9 @@ func ListSingleVariantAKSAvailableVersions(client *rancher.Client, cloudCredenti
 	return singleVersionList, nil
 }
 
-// AddNodepool adds a nodepool to the list
-// TODO: Modify this method to add a custom qty of AddNodepool, perhaps by adding an `increaseBy int` arg
-func AddNodepool(cluster *management.Cluster, client *rancher.Client) (*management.Cluster, error) {
+// AddNodePool adds a nodepool to the list
+// TODO: Modify this method to add a custom qty of AddNodePool, perhaps by adding an `increaseBy int` arg
+func AddNodePool(cluster *management.Cluster, client *rancher.Client) (*management.Cluster, error) {
 	upgradedCluster := new(management.Cluster)
 	upgradedCluster.Name = cluster.Name
 	upgradedCluster.AKSConfig = cluster.AKSConfig
@@ -106,9 +112,9 @@ func AddNodepool(cluster *management.Cluster, client *rancher.Client) (*manageme
 	return cluster, nil
 }
 
-// DeleteNodepool deletes a nodepool from the list
-// TODO: Modify this method to delete a custom qty of DeleteNodepool, perhaps by adding an `decreaseBy int` arg
-func DeleteNodepool(cluster *management.Cluster, client *rancher.Client) (*management.Cluster, error) {
+// DeleteNodePool deletes a nodepool from the list
+// TODO: Modify this method to delete a custom qty of DeleteNodePool, perhaps by adding an `decreaseBy int` arg
+func DeleteNodePool(cluster *management.Cluster, client *rancher.Client) (*management.Cluster, error) {
 	upgradedCluster := new(management.Cluster)
 	upgradedCluster.Name = cluster.Name
 	upgradedCluster.AKSConfig = cluster.AKSConfig
@@ -121,8 +127,8 @@ func DeleteNodepool(cluster *management.Cluster, client *rancher.Client) (*manag
 	return cluster, nil
 }
 
-// ScaleNodepool modifies the number of initialNodeCount of all the nodepools as defined by nodeCount
-func ScaleNodepool(cluster *management.Cluster, client *rancher.Client, nodeCount int64) (*management.Cluster, error) {
+// ScaleNodePool modifies the number of initialNodeCount of all the nodepools as defined by nodeCount
+func ScaleNodePool(cluster *management.Cluster, client *rancher.Client, nodeCount int64) (*management.Cluster, error) {
 	upgradedCluster := new(management.Cluster)
 	upgradedCluster.Name = cluster.Name
 	upgradedCluster.AKSConfig = cluster.AKSConfig
