@@ -33,7 +33,8 @@ var _ = Describe("SupportMatrix", func() {
 				var err error
 				cluster, err = eks.CreateEKSHostedCluster(ctx.RancherClient, clusterName, ctx.CloudCred.ID, false, false, false, false, map[string]string{})
 				Expect(err).To(BeNil())
-				helper.WaitUntilClusterIsReady(cluster, ctx.RancherClient)
+				cluster, err = helper.WaitUntilClusterIsReady(cluster, ctx.RancherClient)
+				Expect(err).To(BeNil())
 			})
 			AfterEach(func() {
 				err := helper.DeleteEKSHostCluster(cluster, ctx.RancherClient)

@@ -2,7 +2,6 @@ package helper
 
 import (
 	"github.com/Masterminds/semver/v3"
-	. "github.com/onsi/gomega"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
@@ -14,16 +13,23 @@ import (
 	"k8s.io/utils/pointer"
 )
 
-// WaitUntilClusterIsReady waits until the cluster is in a Ready state.
-func WaitUntilClusterIsReady(cluster *management.Cluster, client *rancher.Client) {
+// WaitUntilClusterIsReady waits until the cluster is in a Ready state,
+// fetch the cluster again once it's ready so that it has everything up to date and then return it.
+// For e.g. once the cluster has been updated, it contains information such as Version.GitVersion which it does not have before it's ready
+func WaitUntilClusterIsReady(cluster *management.Cluster, client *rancher.Client) (*management.Cluster, error) {
 	opts := metav1.ListOptions{FieldSelector: "metadata.name=" + cluster.ID, TimeoutSeconds: &defaults.WatchTimeoutSeconds}
 	watchInterface, err := client.GetManagementWatchInterface(management.ClusterType, opts)
-	Expect(err).To(BeNil())
+	if err != nil {
+		return nil, err
+	}
 
 	watchFunc := clusters.IsHostedProvisioningClusterReady
 
 	err = wait.WatchWait(watchInterface, watchFunc)
-	Expect(err).To(BeNil())
+	if err != nil {
+		return nil, err
+	}
+	return client.Management.Cluster.ByID(cluster.ID)
 }
 
 // UpgradeKubernetesVersion upgrades the k8s version to the value defined by upgradeToVersion; if upgradeNodePool is true, it also upgrades nodepools' k8s version
@@ -118,6 +124,8 @@ func ListGKEAvailableVersions(client *rancher.Client, clusterID string) (availab
 	return kubernetesversions.ListGKEAvailableVersions(client, cluster)
 }
 
+// ListSingleVariantGKEAvailableVersions returns a list of single variants of minor versions
+// For e.g 1.27.5-gke.1700, 1.26.6-gke.2100, 1.25.8-gke.200
 func ListSingleVariantGKEAvailableVersions(client *rancher.Client, projectID, cloudCredentialID, zone, region string) (availableVersions []string, err error) {
 	availableVersions, err = kubernetesversions.ListGKEAllVersions(client, projectID, cloudCredentialID, zone, region)
 	if err != nil {

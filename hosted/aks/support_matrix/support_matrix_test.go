@@ -2,6 +2,7 @@ package support_matrix_test
 
 import (
 	"fmt"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
@@ -12,6 +13,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/provisioninginput"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
+
 	"github.com/valaparthvi/highlander-tests/hosted/aks/helper"
 )
 
@@ -31,7 +33,8 @@ var _ = Describe("SupportMatrix", func() {
 				var err error
 				cluster, err = aks.CreateAKSHostedCluster(ctx.RancherClient, clusterName, ctx.CloudCred.ID, false, false, false, false, map[string]string{})
 				Expect(err).To(BeNil())
-				helper.WaitUntilClusterIsReady(cluster, ctx.RancherClient)
+				cluster, err = helper.WaitUntilClusterIsReady(cluster, ctx.RancherClient)
+				Expect(err).To(BeNil())
 			})
 			AfterEach(func() {
 				err := helper.DeleteAKSHostCluster(cluster, ctx.RancherClient)

@@ -1,30 +1,34 @@
 package helper
 
 import (
-	. "github.com/onsi/gomega"
+	"github.com/rancher/rancher/tests/framework/clients/rancher"
+	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters/kubernetesversions"
-	"github.com/rancher/rancher/tests/framework/pkg/wait"
-
-	"github.com/rancher/rancher/tests/framework/clients/rancher"
-	client "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
-	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	"github.com/rancher/rancher/tests/framework/extensions/defaults"
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
+	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
 )
 
-// WaitUntilClusterIsReady waits until the cluster is in a Ready state.
-func WaitUntilClusterIsReady(cluster *client.Cluster, client *rancher.Client) {
+// WaitUntilClusterIsReady waits until the cluster is in a Ready state,
+// fetch the cluster again once it's ready so that it has everything up to date and then return it.
+// For e.g. once the cluster has been updated, it contains information such as Version.GitVersion which it does not have before it's ready
+func WaitUntilClusterIsReady(cluster *management.Cluster, client *rancher.Client) (*management.Cluster, error) {
 	opts := metav1.ListOptions{FieldSelector: "metadata.name=" + cluster.ID, TimeoutSeconds: &defaults.WatchTimeoutSeconds}
 	watchInterface, err := client.GetManagementWatchInterface(management.ClusterType, opts)
-	Expect(err).To(BeNil())
+	if err != nil {
+		return nil, err
+	}
 
 	watchFunc := clusters.IsHostedProvisioningClusterReady
 
 	err = wait.WatchWait(watchInterface, watchFunc)
-	Expect(err).To(BeNil())
+	if err != nil {
+		return nil, err
+	}
+	return client.Management.Cluster.ByID(cluster.ID)
 }
 
 // UpgradeClusterKubernetesVersion upgrades the k8s version to the value defined by upgradeToVersion.
