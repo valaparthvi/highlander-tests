@@ -1,14 +1,17 @@
 package helper
 
 import (
+	"fmt"
+
 	"github.com/Masterminds/semver/v3"
-
-	"github.com/rancher/rancher/tests/framework/extensions/clusters/kubernetesversions"
-
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
+	"github.com/rancher/rancher/tests/framework/extensions/clusters/kubernetesversions"
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	"k8s.io/utils/pointer"
+
+	"github.com/epinio/epinio/acceptance/helpers/proc"
+	"github.com/pkg/errors"
 )
 
 // UpgradeClusterKubernetesVersion upgrades the k8s version to the value defined by upgradeToVersion.
@@ -128,4 +131,38 @@ func ListAKSAvailableVersions(client *rancher.Client, clusterID string) (availab
 		return nil, err
 	}
 	return kubernetesversions.ListAKSAvailableVersions(client, cluster)
+}
+
+// Create Azure AKS cluster using AZ CLI
+func CreateAKSClusterOnAzure(location string, clusterName string, k8sVersion string, nodes string) error {
+
+	fmt.Println("Creating AKS resource group ...")
+	out, err := proc.RunW("az", "group", "create", "--location", location, "--resource-group", clusterName)
+	if err != nil {
+		return errors.Wrap(err, "Failed to create cluster: "+out)
+	}
+
+	fmt.Println("Creating AKS cluster ...")
+	out, err = proc.RunW("az", "aks", "create", "--resource-group", clusterName, "--kubernetes-version", k8sVersion, "--enable-managed-identity", "--name", clusterName, "--node-count", nodes)
+	if err != nil {
+		return errors.Wrap(err, "Failed to create cluster: "+out)
+	}
+
+	fmt.Println("Created AKS cluster: ", clusterName)
+
+	return nil
+}
+
+// Complete cleanup steps for Azure AKS
+func DeleteAKSClusteronAzure(clusterName string) error {
+
+	fmt.Println("Deleting AKS resource group which will delete cluster too ...")
+	out, err := proc.RunW("az", "group", "delete", "--name", clusterName, "--yes")
+	if err != nil {
+		return errors.Wrap(err, "Failed to delete resource group: "+out)
+	}
+
+	fmt.Println("Deleted AKS resource group: ", clusterName)
+
+	return nil
 }

@@ -1,12 +1,18 @@
 package helper
 
 import (
+	"fmt"
+	"os"
+
 	"github.com/Masterminds/semver/v3"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters/kubernetesversions"
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	"k8s.io/utils/pointer"
+
+	"github.com/epinio/epinio/acceptance/helpers/proc"
+	"github.com/pkg/errors"
 )
 
 // UpgradeKubernetesVersion upgrades the k8s version to the value defined by upgradeToVersion; if upgradeNodePool is true, it also upgrades nodepools' k8s version
@@ -118,4 +124,36 @@ func ListSingleVariantGKEAvailableVersions(client *rancher.Client, projectID, cl
 		}
 	}
 	return singleVersionList, nil
+}
+
+// Create Google GKE cluster using gcloud CLI
+func CreateGKEClusterOnGCloud(clusterName string) error {
+	gke_zone := os.Getenv("GKE_ZONE")
+
+	fmt.Println("Creating GKE cluster ...")
+	os.Setenv("USE_GKE_GCLOUD_AUTH_PLUGIN", "true")
+	out, err := proc.RunW("gcloud", "container", "clusters", "delete", clusterName, "--zone", gke_zone, "--quiet")
+	if err != nil {
+		return errors.Wrap(err, "Failed to create cluster: "+out)
+	}
+
+	fmt.Println("Created GKE cluster: ", clusterName)
+
+	return nil
+}
+
+// Complete cleanup steps for Google GKE
+func DeleteGKEClusterOnGCloud(clusterName string) error {
+	gke_zone := os.Getenv("GKE_ZONE")
+
+	fmt.Println("Deleting GKE cluster ...")
+	os.Setenv("USE_GKE_GCLOUD_AUTH_PLUGIN", "true")
+	out, err := proc.RunW("gcloud", "container", "clusters", "delete", clusterName, "--zone", gke_zone, "--quiet")
+	if err != nil {
+		return errors.Wrap(err, "Failed to delete cluster: "+out)
+	}
+
+	fmt.Println("Deleted GKE cluster: ", clusterName)
+
+	return nil
 }

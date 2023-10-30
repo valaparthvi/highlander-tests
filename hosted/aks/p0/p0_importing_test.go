@@ -29,7 +29,7 @@ var _ = Describe("P0Importing", func() {
 		var cluster *management.Cluster
 
 		BeforeEach(func() {
-			err := helpers.CreateClusterAKS(location, clusterName, k8sVersion, "2")
+			err := helper.CreateAKSClusterOnAzure(location, clusterName, k8sVersion, "2")
 			Expect(err).To(BeNil())
 			// TODO
 			// cluster, err = helper.ImportCluster(ctx.RancherClient, clusterName, restConfig)
@@ -38,7 +38,7 @@ var _ = Describe("P0Importing", func() {
 		AfterEach(func() {
 			err := helper.DeleteAKSHostCluster(cluster, ctx.RancherClient)
 			Expect(err).To(BeNil())
-			err = helpers.DeleteClusterAKS(clusterName)
+			err = helper.DeleteAKSClusteronAzure(clusterName)
 			Expect(err).To(BeNil())
 		})
 		It("should successfully import the cluster", func() {

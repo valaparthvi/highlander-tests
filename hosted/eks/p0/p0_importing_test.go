@@ -29,7 +29,7 @@ var _ = Describe("P0Importing", func() {
 		var cluster *management.Cluster
 
 		BeforeEach(func() {
-			err := helpers.CreateClusterEKS(region, clusterName, k8sVersion, "2")
+			err := helper.CreateEKSClusterOnAWS(region, clusterName, k8sVersion, "2")
 			Expect(err).To(BeNil())
 			// TODO
 			// cluster, err = helper.ImportCluster(ctx.RancherClient, clusterName, restConfig)
@@ -38,7 +38,7 @@ var _ = Describe("P0Importing", func() {
 		AfterEach(func() {
 			err := helper.DeleteEKSHostCluster(cluster, ctx.RancherClient)
 			Expect(err).To(BeNil())
-			err = helpers.DeleteClusterEKS(region, clusterName)
+			err = helper.DeleteEKSClusterOnAWS(region, clusterName)
 			Expect(err).To(BeNil())
 		})
 
