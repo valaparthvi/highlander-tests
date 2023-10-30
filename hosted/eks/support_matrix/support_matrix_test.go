@@ -15,6 +15,7 @@ import (
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 
 	"github.com/valaparthvi/highlander-tests/hosted/eks/helper"
+	"github.com/valaparthvi/highlander-tests/hosted/helpers"
 )
 
 var _ = Describe("SupportMatrix", func() {
@@ -33,7 +34,7 @@ var _ = Describe("SupportMatrix", func() {
 				var err error
 				cluster, err = eks.CreateEKSHostedCluster(ctx.RancherClient, clusterName, ctx.CloudCred.ID, false, false, false, false, map[string]string{})
 				Expect(err).To(BeNil())
-				cluster, err = helper.WaitUntilClusterIsReady(cluster, ctx.RancherClient)
+				cluster, err = helpers.WaitUntilClusterIsReady(cluster, ctx.RancherClient)
 				Expect(err).To(BeNil())
 			})
 			AfterEach(func() {

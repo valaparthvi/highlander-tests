@@ -5,7 +5,6 @@ import (
 	. "github.com/onsi/gomega"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
-	"github.com/rancher/rancher/tests/framework/extensions/clusters/eks"
 	nodestat "github.com/rancher/rancher/tests/framework/extensions/nodes"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
@@ -14,32 +13,36 @@ import (
 	"github.com/valaparthvi/highlander-tests/hosted/helpers"
 )
 
-var _ = Describe("P0Provisioning", func() {
+var _ = Describe("P0Importing", func() {
 	var (
 		clusterName string
 		ctx         helpers.Context
+		region      = "us-west-2"
+		k8sVersion  = "1.26"
 	)
 	var _ = BeforeEach(func() {
 		clusterName = namegen.AppendRandomString("ekshostcluster")
 		ctx = helpers.CommonBeforeSuite("eks")
 	})
 
-	When("a cluster is created", func() {
+	When("a cluster is imported", func() {
 		var cluster *management.Cluster
 
 		BeforeEach(func() {
-			var err error
-			cluster, err = eks.CreateEKSHostedCluster(ctx.RancherClient, clusterName, ctx.CloudCred.ID, false, false, false, false, map[string]string{})
+			err := helper.CreateEKSClusterOnAWS(region, clusterName, k8sVersion, "2")
 			Expect(err).To(BeNil())
-			cluster, err = helpers.WaitUntilClusterIsReady(cluster, ctx.RancherClient)
-			Expect(err).To(BeNil())
+			// TODO
+			// cluster, err = helper.ImportCluster(ctx.RancherClient, clusterName, restConfig)
+			// Expect(err).To(BeNil())
 		})
 		AfterEach(func() {
 			err := helper.DeleteEKSHostCluster(cluster, ctx.RancherClient)
 			Expect(err).To(BeNil())
+			err = helper.DeleteEKSClusterOnAWS(region, clusterName)
+			Expect(err).To(BeNil())
 		})
 
-		It("should successfully provision the cluster", func() {
+		It("should successfully import the cluster", func() {
 
 			By("checking cluster name is same", func() {
 				Expect(cluster.Name).To(BeEquivalentTo(clusterName))

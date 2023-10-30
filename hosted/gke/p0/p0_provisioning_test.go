@@ -11,16 +11,17 @@ import (
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 
 	"github.com/valaparthvi/highlander-tests/hosted/gke/helper"
+	"github.com/valaparthvi/highlander-tests/hosted/helpers"
 )
 
 var _ = Describe("P0Provisioning", func() {
 	var (
 		clusterName string
-		ctx         helper.Context
+		ctx         helpers.Context
 	)
 	var _ = BeforeEach(func() {
 		clusterName = namegen.AppendRandomString("gkehostcluster")
-		ctx = helper.CommonBeforeSuite()
+		ctx = helpers.CommonBeforeSuite("gke")
 	})
 
 	When("a cluster is created", func() {
@@ -30,7 +31,7 @@ var _ = Describe("P0Provisioning", func() {
 			var err error
 			cluster, err = gke.CreateGKEHostedCluster(ctx.RancherClient, clusterName, ctx.CloudCred.ID, false, false, false, false, map[string]string{})
 			Expect(err).To(BeNil())
-			cluster, err = helper.WaitUntilClusterIsReady(cluster, ctx.RancherClient)
+			cluster, err = helpers.WaitUntilClusterIsReady(cluster, ctx.RancherClient)
 			Expect(err).To(BeNil())
 		})
 		AfterEach(func() {
@@ -38,7 +39,6 @@ var _ = Describe("P0Provisioning", func() {
 			Expect(err).To(BeNil())
 		})
 		It("should successfully provision the cluster", func() {
-			var cluster *management.Cluster
 
 			By("checking cluster name is same", func() {
 				Expect(cluster.Name).To(BeEquivalentTo(clusterName))
