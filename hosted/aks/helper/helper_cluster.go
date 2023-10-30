@@ -3,36 +3,13 @@ package helper
 import (
 	"github.com/Masterminds/semver/v3"
 
-	"github.com/rancher/rancher/tests/framework/extensions/clusters"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters/kubernetesversions"
-	"github.com/rancher/rancher/tests/framework/pkg/wait"
 
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
-	"github.com/rancher/rancher/tests/framework/extensions/defaults"
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
 )
-
-// WaitUntilClusterIsReady waits until the cluster is in a Ready state,
-// fetch the cluster again once it's ready so that it has everything up to date and then return it.
-// For e.g. once the cluster has been updated, it contains information such as Version.GitVersion which it does not have before it's ready
-func WaitUntilClusterIsReady(cluster *management.Cluster, client *rancher.Client) (*management.Cluster, error) {
-	opts := metav1.ListOptions{FieldSelector: "metadata.name=" + cluster.ID, TimeoutSeconds: &defaults.WatchTimeoutSeconds}
-	watchInterface, err := client.GetManagementWatchInterface(management.ClusterType, opts)
-	if err != nil {
-		return nil, err
-	}
-	watchFunc := clusters.IsHostedProvisioningClusterReady
-
-	err = wait.WatchWait(watchInterface, watchFunc)
-	if err != nil {
-		return nil, err
-	}
-	return client.Management.Cluster.ByID(cluster.ID)
-
-}
 
 // UpgradeClusterKubernetesVersion upgrades the k8s version to the value defined by upgradeToVersion.
 func UpgradeClusterKubernetesVersion(cluster *management.Cluster, upgradeToVersion *string, client *rancher.Client) (*management.Cluster, error) {

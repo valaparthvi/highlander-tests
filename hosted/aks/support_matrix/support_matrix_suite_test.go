@@ -1,8 +1,10 @@
 package support_matrix_test
 
 import (
-	"github.com/valaparthvi/highlander-tests/hosted/aks/helper"
 	"testing"
+
+	"github.com/valaparthvi/highlander-tests/hosted/aks/helper"
+	"github.com/valaparthvi/highlander-tests/hosted/helpers"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -10,12 +12,12 @@ import (
 
 var (
 	availableVersionList []string
-	ctx                  helper.Context
+	ctx                  helpers.Context
 )
 
 func TestSupportMatrix(t *testing.T) {
 	RegisterFailHandler(Fail)
-	ctx = helper.CommonBeforeSuite()
+	ctx = helpers.CommonBeforeSuite("aks")
 	var err error
 	availableVersionList, err = helper.ListSingleVariantAKSAvailableVersions(ctx.RancherClient, ctx.CloudCred.ID, "eastus")
 	Expect(err).To(BeNil())

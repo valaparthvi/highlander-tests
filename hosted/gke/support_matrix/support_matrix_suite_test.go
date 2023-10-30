@@ -1,8 +1,10 @@
 package support_matrix_test
 
 import (
-	"github.com/valaparthvi/highlander-tests/hosted/gke/helper"
 	"testing"
+
+	"github.com/valaparthvi/highlander-tests/hosted/gke/helper"
+	"github.com/valaparthvi/highlander-tests/hosted/helpers"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -10,12 +12,12 @@ import (
 
 var (
 	availableVersionList []string
-	ctx                  helper.Context
+	ctx                  helpers.Context
 )
 
 func TestSupportMatrix(t *testing.T) {
 	RegisterFailHandler(Fail)
-	ctx = helper.CommonBeforeSuite()
+	ctx = helpers.CommonBeforeSuite("gke")
 	var err error
 	availableVersionList, err = helper.ListSingleVariantGKEAvailableVersions(ctx.RancherClient, "container-project-qa", ctx.CloudCred.ID, "", "us-central1")
 	Expect(err).To(BeNil())

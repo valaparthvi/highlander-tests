@@ -12,9 +12,11 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/pipeline"
 	"github.com/rancher/rancher/tests/framework/extensions/provisioninginput"
 	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
+	"github.com/rancher/rancher/tests/framework/pkg/config"
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 
 	"github.com/valaparthvi/highlander-tests/hosted/aks/helper"
+	"github.com/valaparthvi/highlander-tests/hosted/helpers"
 )
 
 var _ = Describe("SupportMatrix", func() {
@@ -31,9 +33,15 @@ var _ = Describe("SupportMatrix", func() {
 				clusterName = namegen.AppendRandomString("akshostcluster")
 				pipeline.UpdateHostedKubernetesVField(provisioninginput.AzureProviderName.String(), version)
 				var err error
+				aksConfig := new(aks.ClusterConfig)
+				config.LoadAndUpdateConfig(aks.AKSClusterConfigConfigurationFileKey, aksConfig, func() {
+					aksConfig.ResourceGroup = clusterName
+					dnsPrefix := clusterName + "-dns"
+					aksConfig.DNSPrefix = &dnsPrefix
+				})
 				cluster, err = aks.CreateAKSHostedCluster(ctx.RancherClient, clusterName, ctx.CloudCred.ID, false, false, false, false, map[string]string{})
 				Expect(err).To(BeNil())
-				cluster, err = helper.WaitUntilClusterIsReady(cluster, ctx.RancherClient)
+				cluster, err = helpers.WaitUntilClusterIsReady(cluster, ctx.RancherClient)
 				Expect(err).To(BeNil())
 			})
 			AfterEach(func() {

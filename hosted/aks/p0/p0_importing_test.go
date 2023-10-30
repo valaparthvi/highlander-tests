@@ -3,50 +3,45 @@ package p0_test
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	nodestat "github.com/rancher/rancher/tests/framework/extensions/nodes"
-	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
 
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
-	"github.com/rancher/rancher/tests/framework/extensions/clusters/aks"
-	"github.com/rancher/rancher/tests/framework/pkg/config"
+	nodestat "github.com/rancher/rancher/tests/framework/extensions/nodes"
+	"github.com/rancher/rancher/tests/framework/extensions/workloads/pods"
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 
 	"github.com/valaparthvi/highlander-tests/hosted/aks/helper"
 	"github.com/valaparthvi/highlander-tests/hosted/helpers"
 )
 
-var _ = Describe("P0Provisioning", func() {
+var _ = Describe("P0Importing", func() {
 	var (
-		clusterName string
 		ctx         helpers.Context
+		clusterName string
+		location    = "eastus"
+		k8sVersion  = "1.26.6"
 	)
 	var _ = BeforeEach(func() {
 		clusterName = namegen.AppendRandomString("akshostcluster")
 		ctx = helpers.CommonBeforeSuite("aks")
-
 	})
-	When("a cluster is created", func() {
+	When("a cluster is imported", func() {
 		var cluster *management.Cluster
 
 		BeforeEach(func() {
-			var err error
-			aksConfig := new(aks.ClusterConfig)
-			config.LoadAndUpdateConfig(aks.AKSClusterConfigConfigurationFileKey, aksConfig, func() {
-				aksConfig.ResourceGroup = clusterName
-				dnsPrefix := clusterName + "-dns"
-				aksConfig.DNSPrefix = &dnsPrefix
-			})
-			cluster, err = aks.CreateAKSHostedCluster(ctx.RancherClient, clusterName, ctx.CloudCred.ID, false, false, false, false, map[string]string{})
+			err := helpers.CreateClusterAKS(location, clusterName, k8sVersion, "2")
 			Expect(err).To(BeNil())
-			cluster, err = helpers.WaitUntilClusterIsReady(cluster, ctx.RancherClient)
-			Expect(err).To(BeNil())
+			// TODO
+			// cluster, err = helper.ImportCluster(ctx.RancherClient, clusterName, restConfig)
+			// Expect(err).To(BeNil())
 		})
 		AfterEach(func() {
 			err := helper.DeleteAKSHostCluster(cluster, ctx.RancherClient)
 			Expect(err).To(BeNil())
+			err = helpers.DeleteClusterAKS(clusterName)
+			Expect(err).To(BeNil())
 		})
-		It("should successfully provision the cluster", func() {
+		It("should successfully import the cluster", func() {
 
 			By("checking cluster name is same", func() {
 				Expect(cluster.Name).To(BeEquivalentTo(clusterName))
