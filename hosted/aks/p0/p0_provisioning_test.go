@@ -20,6 +20,7 @@ var _ = Describe("P0Provisioning", func() {
 	var (
 		clusterName string
 		ctx         helpers.Context
+		increaseBy  = 1
 	)
 	var _ = BeforeEach(func() {
 		clusterName = namegen.AppendRandomString("akshostcluster")
@@ -43,6 +44,7 @@ var _ = Describe("P0Provisioning", func() {
 			Expect(err).To(BeNil())
 		})
 		AfterEach(func() {
+			// TODO: Delete Resource group also from AKS
 			err := helper.DeleteAKSHostCluster(cluster, ctx.RancherClient)
 			Expect(err).To(BeNil())
 		})
@@ -113,7 +115,7 @@ var _ = Describe("P0Provisioning", func() {
 
 			By("adding a nodepool", func() {
 				var err error
-				cluster, err = helper.AddNodePool(cluster, ctx.RancherClient)
+				cluster, err = helper.AddNodePool(cluster, increaseBy, ctx.RancherClient)
 				Expect(err).To(BeNil())
 				err = clusters.WaitClusterToBeUpgraded(ctx.RancherClient, cluster.ID)
 				Expect(err).To(BeNil())

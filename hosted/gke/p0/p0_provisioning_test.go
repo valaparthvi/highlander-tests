@@ -18,6 +18,7 @@ var _ = Describe("P0Provisioning", func() {
 	var (
 		clusterName string
 		ctx         helpers.Context
+		increaseBy  = 1
 	)
 	var _ = BeforeEach(func() {
 		clusterName = namegen.AppendRandomString("gkehostcluster")
@@ -105,7 +106,7 @@ var _ = Describe("P0Provisioning", func() {
 
 			By("adding a nodepool", func() {
 				var err error
-				cluster, err = helper.AddNodePool(cluster, ctx.RancherClient)
+				cluster, err = helper.AddNodePool(cluster, increaseBy, ctx.RancherClient)
 				Expect(err).To(BeNil())
 				err = clusters.WaitClusterToBeUpgraded(ctx.RancherClient, cluster.ID)
 				Expect(err).To(BeNil())

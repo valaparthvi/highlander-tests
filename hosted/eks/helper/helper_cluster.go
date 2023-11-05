@@ -6,6 +6,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters/kubernetesversions"
+	"github.com/rancher/rancher/tests/framework/pkg/config"
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	"k8s.io/utils/pointer"
 
@@ -49,24 +50,25 @@ func DeleteEKSHostCluster(cluster *management.Cluster, client *rancher.Client) e
 }
 
 // AddNodeGroup adds a nodegroup to the list
-// TODO: Modify this method to add a custom qty of AddNodeGroup, perhaps by adding an `increaseBy int` arg
-func AddNodeGroup(cluster *management.Cluster, client *rancher.Client) (*management.Cluster, error) {
+func AddNodeGroup(cluster *management.Cluster, increaseBy int, client *rancher.Client) (*management.Cluster, error) {
 	upgradedCluster := new(management.Cluster)
 	upgradedCluster.Name = cluster.Name
 	upgradedCluster.EKSConfig = cluster.EKSConfig
+	nodeConfig := EksHostNodeConfig()
 
-	existingNodeGroup := cluster.EKSConfig.NodeGroups[0]
-	newNodeGroup := management.NodeGroup{
-		DesiredSize:   existingNodeGroup.DesiredSize,
-		DiskSize:      existingNodeGroup.DiskSize,
-		InstanceType:  existingNodeGroup.InstanceType,
-		MaxSize:       existingNodeGroup.MaxSize,
-		MinSize:       existingNodeGroup.MinSize,
-		NodegroupName: pointer.String(namegen.AppendRandomString("nodegroup")),
-		Version:       existingNodeGroup.Version,
+	for i := 1; i <= increaseBy; i++ {
+		for _, ng := range nodeConfig {
+			newNodeGroup := management.NodeGroup{
+				NodegroupName: pointer.String(namegen.AppendRandomString("nodegroup")),
+				DesiredSize:   ng.DesiredSize,
+				DiskSize:      ng.DiskSize,
+				InstanceType:  ng.InstanceType,
+				MaxSize:       ng.MaxSize,
+				MinSize:       ng.MinSize,
+			}
+			upgradedCluster.EKSConfig.NodeGroups = append(upgradedCluster.EKSConfig.NodeGroups, newNodeGroup)
+		}
 	}
-	upgradedCluster.EKSConfig.NodeGroups = append(upgradedCluster.EKSConfig.NodeGroups, newNodeGroup)
-
 	cluster, err := client.Management.Cluster.Update(cluster, &upgradedCluster)
 	if err != nil {
 		return nil, err
@@ -143,4 +145,49 @@ func DeleteEKSClusterOnAWS(eks_region string, clusterName string) error {
 	fmt.Println("Deleted EKS cluster: ", clusterName)
 
 	return nil
+}
+
+func ImportEKSHostedCluster(client *rancher.Client, displayName, cloudCredentialID string, enableClusterAlerting, enableClusterMonitoring, enableNetworkPolicy, windowsPreferedCluster bool, labels map[string]string) (*management.Cluster, error) {
+	eksHostCluster := EksHostClusterConfig(displayName, cloudCredentialID)
+	cluster := &management.Cluster{
+		DockerRootDir:           "/var/lib/docker",
+		EKSConfig:               eksHostCluster,
+		Name:                    displayName,
+		EnableClusterAlerting:   enableClusterAlerting,
+		EnableClusterMonitoring: enableClusterMonitoring,
+		EnableNetworkPolicy:     &enableNetworkPolicy,
+		Labels:                  labels,
+		WindowsPreferedCluster:  windowsPreferedCluster,
+	}
+
+	clusterResp, err := client.Management.Cluster.Create(cluster)
+	if err != nil {
+		return nil, err
+	}
+	return clusterResp, err
+}
+
+func EksHostClusterConfig(displayName, cloudCredentialID string) *management.EKSClusterConfigSpec {
+	var eksClusterConfig ImportClusterConfig
+	config.LoadConfig("eksClusterConfig", &eksClusterConfig)
+
+	return &management.EKSClusterConfigSpec{
+		AmazonCredentialSecret: cloudCredentialID,
+		DisplayName:            displayName,
+		Imported:               eksClusterConfig.Imported,
+		Region:                 eksClusterConfig.Region,
+	}
+}
+
+func EksHostNodeConfig() []management.NodeGroup {
+	var nodeConfig management.EKSClusterConfigSpec
+	config.LoadConfig("eksClusterConfig", &nodeConfig)
+
+	return nodeConfig.NodeGroups
+}
+
+type ImportClusterConfig struct {
+	Region     string                  `json:"region" yaml:"region"`
+	Imported   bool                    `json:"imported" yaml:"imported"`
+	NodeGroups []*management.NodeGroup `json:"nodeGroups" yaml:"nodeGroups"`
 }

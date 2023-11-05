@@ -2,12 +2,12 @@ package helper
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters/kubernetesversions"
+	"github.com/rancher/rancher/tests/framework/pkg/config"
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	"k8s.io/utils/pointer"
 
@@ -40,24 +40,26 @@ func DeleteGKEHostCluster(cluster *management.Cluster, client *rancher.Client) e
 }
 
 // AddNodePool adds a nodepool to the list
-// TODO: Modify this method to add a custom qty of nodepool, perhaps by adding an `increaseBy int` arg
-func AddNodePool(cluster *management.Cluster, client *rancher.Client) (*management.Cluster, error) {
+func AddNodePool(cluster *management.Cluster, increaseBy int, client *rancher.Client) (*management.Cluster, error) {
 	upgradedCluster := new(management.Cluster)
 	upgradedCluster.Name = cluster.Name
 	upgradedCluster.GKEConfig = cluster.GKEConfig
+	nodeConfig := GkeHostNodeConfig()
 
-	existingNodePool := cluster.GKEConfig.NodePools[0]
-	newNodePool := management.GKENodePoolConfig{
-		Autoscaling:       existingNodePool.Autoscaling,
-		Config:            existingNodePool.Config,
-		InitialNodeCount:  existingNodePool.InitialNodeCount,
-		Management:        existingNodePool.Management,
-		MaxPodsConstraint: existingNodePool.MaxPodsConstraint,
-		Name:              pointer.String(namegen.AppendRandomString("nodepool")),
-		Version:           existingNodePool.Version,
+	for i := 1; i <= increaseBy; i++ {
+		for _, np := range nodeConfig {
+			newNodepool := management.GKENodePoolConfig{
+				InitialNodeCount:  np.InitialNodeCount,
+				Version:           np.Version,
+				Config:            np.Config,
+				Autoscaling:       np.Autoscaling,
+				Management:        np.Management,
+				MaxPodsConstraint: np.MaxPodsConstraint,
+				Name:              pointer.String(namegen.RandStringLower(5)),
+			}
+			upgradedCluster.GKEConfig.NodePools = append(upgradedCluster.GKEConfig.NodePools, newNodepool)
+		}
 	}
-	upgradedCluster.GKEConfig.NodePools = append(upgradedCluster.GKEConfig.NodePools, newNodePool)
-
 	cluster, err := client.Management.Cluster.Update(cluster, &upgradedCluster)
 	if err != nil {
 		return nil, err
@@ -127,12 +129,10 @@ func ListSingleVariantGKEAvailableVersions(client *rancher.Client, projectID, cl
 }
 
 // Create Google GKE cluster using gcloud CLI
-func CreateGKEClusterOnGCloud(clusterName string) error {
-	gke_zone := os.Getenv("GKE_ZONE")
+func CreateGKEClusterOnGCloud(zone string, clusterName string, project string, k8sVersion string) error {
 
 	fmt.Println("Creating GKE cluster ...")
-	os.Setenv("USE_GKE_GCLOUD_AUTH_PLUGIN", "true")
-	out, err := proc.RunW("gcloud", "container", "clusters", "delete", clusterName, "--zone", gke_zone, "--quiet")
+	out, err := proc.RunW("gcloud", "container", "clusters", "create", clusterName, "--project", project, "--zone", zone, "--cluster-version", k8sVersion, "--network", "default", "--release-channel", "None", "--machine-type", "n2-standard-2", "--disk-size", "100", "--num-nodes", "1", "--no-enable-cloud-logging", "--no-enable-cloud-monitoring", "--no-enable-master-authorized-networks")
 	if err != nil {
 		return errors.Wrap(err, "Failed to create cluster: "+out)
 	}
@@ -143,12 +143,10 @@ func CreateGKEClusterOnGCloud(clusterName string) error {
 }
 
 // Complete cleanup steps for Google GKE
-func DeleteGKEClusterOnGCloud(clusterName string) error {
-	gke_zone := os.Getenv("GKE_ZONE")
+func DeleteGKEClusterOnGCloud(zone string, clusterName string) error {
 
 	fmt.Println("Deleting GKE cluster ...")
-	os.Setenv("USE_GKE_GCLOUD_AUTH_PLUGIN", "true")
-	out, err := proc.RunW("gcloud", "container", "clusters", "delete", clusterName, "--zone", gke_zone, "--quiet")
+	out, err := proc.RunW("gcloud", "container", "clusters", "delete", clusterName, "--zone", zone, "--quiet")
 	if err != nil {
 		return errors.Wrap(err, "Failed to delete cluster: "+out)
 	}
@@ -156,4 +154,51 @@ func DeleteGKEClusterOnGCloud(clusterName string) error {
 	fmt.Println("Deleted GKE cluster: ", clusterName)
 
 	return nil
+}
+
+func ImportGKEHostedCluster(client *rancher.Client, displayName, cloudCredentialID string, enableClusterAlerting, enableClusterMonitoring, enableNetworkPolicy, windowsPreferedCluster bool, labels map[string]string) (*management.Cluster, error) {
+	gkeHostCluster := GkeHostClusterConfig(displayName, cloudCredentialID)
+	cluster := &management.Cluster{
+		DockerRootDir:           "/var/lib/docker",
+		GKEConfig:               gkeHostCluster,
+		Name:                    displayName,
+		EnableClusterAlerting:   enableClusterAlerting,
+		EnableClusterMonitoring: enableClusterMonitoring,
+		EnableNetworkPolicy:     &enableNetworkPolicy,
+		Labels:                  labels,
+		WindowsPreferedCluster:  windowsPreferedCluster,
+	}
+
+	clusterResp, err := client.Management.Cluster.Create(cluster)
+	if err != nil {
+		return nil, err
+	}
+	return clusterResp, err
+}
+
+func GkeHostClusterConfig(displayName, cloudCredentialID string) *management.GKEClusterConfigSpec {
+	var gkeClusterConfig ImportClusterConfig
+	config.LoadConfig("gkeClusterConfig", &gkeClusterConfig)
+
+	return &management.GKEClusterConfigSpec{
+		GoogleCredentialSecret: cloudCredentialID,
+		ClusterName:            displayName,
+		Imported:               gkeClusterConfig.Imported,
+		Zone:                   gkeClusterConfig.Zone,
+		ProjectID:              gkeClusterConfig.ProjectID,
+	}
+}
+
+func GkeHostNodeConfig() []management.GKENodePoolConfig {
+	var nodeConfig management.GKEClusterConfigSpec
+	config.LoadConfig("gkeClusterConfig", &nodeConfig)
+
+	return nodeConfig.NodePools
+}
+
+type ImportClusterConfig struct {
+	ProjectID string                          `json:"projectID" yaml:"projectID"`
+	Zone      string                          `json:"zone" yaml:"zone"`
+	Imported  bool                            `json:"imported" yaml:"imported"`
+	NodePools []*management.GKENodePoolConfig `json:"nodePools" yaml:"nodePools"`
 }
