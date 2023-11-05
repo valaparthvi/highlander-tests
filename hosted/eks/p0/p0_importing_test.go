@@ -19,6 +19,7 @@ var _ = Describe("P0Importing", func() {
 		ctx         helpers.Context
 		region      = "us-west-2"
 		k8sVersion  = "1.26"
+		increaseBy  = 1
 	)
 	var _ = BeforeEach(func() {
 		clusterName = namegen.AppendRandomString("ekshostcluster")
@@ -29,17 +30,25 @@ var _ = Describe("P0Importing", func() {
 		var cluster *management.Cluster
 
 		BeforeEach(func() {
-			err := helper.CreateEKSClusterOnAWS(region, clusterName, k8sVersion, "2")
+			var err error
+			err = helper.CreateEKSClusterOnAWS(region, clusterName, k8sVersion, "1")
 			Expect(err).To(BeNil())
-			// TODO
-			// cluster, err = helper.ImportCluster(ctx.RancherClient, clusterName, restConfig)
-			// Expect(err).To(BeNil())
+			cluster, err = helper.ImportEKSHostedCluster(ctx.RancherClient, clusterName, ctx.CloudCred.ID, false, false, false, false, map[string]string{})
+			Expect(err).To(BeNil())
+			cluster, err = helpers.WaitUntilClusterIsReady(cluster, ctx.RancherClient)
+			Expect(err).To(BeNil())
+			// Workaround to add new Nodegroup till https://github.com/rancher/aks-operator/issues/251 is fixed
+			cluster, err = helper.AddNodeGroup(cluster, increaseBy, ctx.RancherClient)
+			Expect(err).To(BeNil())
+			err = clusters.WaitClusterToBeUpgraded(ctx.RancherClient, cluster.ID)
+			Expect(err).To(BeNil())
 		})
 		AfterEach(func() {
 			err := helper.DeleteEKSHostCluster(cluster, ctx.RancherClient)
 			Expect(err).To(BeNil())
 			err = helper.DeleteEKSClusterOnAWS(region, clusterName)
 			Expect(err).To(BeNil())
+			// TODO: Force delete EKS cluster
 		})
 
 		It("should successfully import the cluster", func() {
@@ -102,9 +111,9 @@ var _ = Describe("P0Importing", func() {
 		It("should be possible to add or delete the NodeGroups", func() {
 			currentNodeGroupNumber := len(cluster.EKSConfig.NodeGroups)
 
-			By("adding a NodeGroup", func() {
+			By("adding a NodeGroup/s", func() {
 				var err error
-				cluster, err = helper.AddNodeGroup(cluster, ctx.RancherClient)
+				cluster, err = helper.AddNodeGroup(cluster, increaseBy, ctx.RancherClient)
 				Expect(err).To(BeNil())
 				err = clusters.WaitClusterToBeUpgraded(ctx.RancherClient, cluster.ID)
 				Expect(err).To(BeNil())

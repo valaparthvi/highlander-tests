@@ -7,6 +7,7 @@ import (
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters/kubernetesversions"
+	"github.com/rancher/rancher/tests/framework/pkg/config"
 	namegen "github.com/rancher/rancher/tests/framework/pkg/namegenerator"
 	"k8s.io/utils/pointer"
 
@@ -69,22 +70,25 @@ func ListSingleVariantAKSAvailableVersions(client *rancher.Client, cloudCredenti
 }
 
 // AddNodePool adds a nodepool to the list
-// TODO: Modify this method to add a custom qty of AddNodePool, perhaps by adding an `increaseBy int` arg
-func AddNodePool(cluster *management.Cluster, client *rancher.Client) (*management.Cluster, error) {
+func AddNodePool(cluster *management.Cluster, increaseBy int, client *rancher.Client) (*management.Cluster, error) {
 	upgradedCluster := new(management.Cluster)
 	upgradedCluster.Name = cluster.Name
 	upgradedCluster.AKSConfig = cluster.AKSConfig
+	nodeConfig := AksHostNodeConfig()
 
-	existingNodepool := cluster.AKSConfig.NodePools[0]
-	newNodepool := management.AKSNodePool{
-		Count:               existingNodepool.Count,
-		VMSize:              existingNodepool.VMSize,
-		Mode:                "User",
-		Name:                pointer.String(namegen.RandStringLower(5)),
-		OrchestratorVersion: existingNodepool.OrchestratorVersion,
+	// TODO: Get Count from config file or function parameter
+	for i := 1; i <= increaseBy; i++ {
+		for _, np := range nodeConfig {
+			newNodepool := management.AKSNodePool{
+				Count:             pointer.Int64(1),
+				VMSize:            np.VMSize,
+				Mode:              np.Mode,
+				EnableAutoScaling: np.EnableAutoScaling,
+				Name:              pointer.String(namegen.RandStringLower(5)),
+			}
+			upgradedCluster.AKSConfig.NodePools = append(upgradedCluster.AKSConfig.NodePools, newNodepool)
+		}
 	}
-	upgradedCluster.AKSConfig.NodePools = append(upgradedCluster.AKSConfig.NodePools, newNodepool)
-
 	cluster, err := client.Management.Cluster.Update(cluster, &upgradedCluster)
 	if err != nil {
 		return nil, err
@@ -165,4 +169,51 @@ func DeleteAKSClusteronAzure(clusterName string) error {
 	fmt.Println("Deleted AKS resource group: ", clusterName)
 
 	return nil
+}
+
+func ImportAKSHostedCluster(client *rancher.Client, displayName, cloudCredentialID string, enableClusterAlerting, enableClusterMonitoring, enableNetworkPolicy, windowsPreferedCluster bool, labels map[string]string) (*management.Cluster, error) {
+	aksHostCluster := AksHostClusterConfig(displayName, cloudCredentialID)
+	cluster := &management.Cluster{
+		DockerRootDir:           "/var/lib/docker",
+		AKSConfig:               aksHostCluster,
+		Name:                    displayName,
+		EnableClusterAlerting:   enableClusterAlerting,
+		EnableClusterMonitoring: enableClusterMonitoring,
+		EnableNetworkPolicy:     &enableNetworkPolicy,
+		Labels:                  labels,
+		WindowsPreferedCluster:  windowsPreferedCluster,
+	}
+
+	clusterResp, err := client.Management.Cluster.Create(cluster)
+	if err != nil {
+		return nil, err
+	}
+	return clusterResp, err
+}
+
+func AksHostClusterConfig(displayName, cloudCredentialID string) *management.AKSClusterConfigSpec {
+	var aksClusterConfig ImportClusterConfig
+	config.LoadConfig("aksClusterConfig", &aksClusterConfig)
+
+	return &management.AKSClusterConfigSpec{
+		AzureCredentialSecret: cloudCredentialID,
+		ClusterName:           displayName,
+		Imported:              aksClusterConfig.Imported,
+		ResourceLocation:      aksClusterConfig.ResourceLocation,
+		ResourceGroup:         aksClusterConfig.ResourceGroup,
+	}
+}
+
+func AksHostNodeConfig() []management.AKSNodePool {
+	var nodeConfig management.AKSClusterConfigSpec
+	config.LoadConfig("aksClusterConfig", &nodeConfig)
+
+	return nodeConfig.NodePools
+}
+
+type ImportClusterConfig struct {
+	ResourceGroup    string                    `json:"resourceGroup" yaml:"resourceGroup"`
+	ResourceLocation string                    `json:"resourceLocation" yaml:"resourceLocation"`
+	Imported         bool                      `json:"imported" yaml:"imported"`
+	NodePools        []*management.AKSNodePool `json:"nodePools" yaml:"nodePools"`
 }

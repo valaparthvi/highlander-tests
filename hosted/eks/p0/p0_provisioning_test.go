@@ -18,6 +18,7 @@ var _ = Describe("P0Provisioning", func() {
 	var (
 		clusterName string
 		ctx         helpers.Context
+		increaseBy  = 1
 	)
 	var _ = BeforeEach(func() {
 		clusterName = namegen.AppendRandomString("ekshostcluster")
@@ -101,7 +102,7 @@ var _ = Describe("P0Provisioning", func() {
 
 			By("adding a NodeGroup", func() {
 				var err error
-				cluster, err = helper.AddNodeGroup(cluster, ctx.RancherClient)
+				cluster, err = helper.AddNodeGroup(cluster, increaseBy, ctx.RancherClient)
 				Expect(err).To(BeNil())
 				err = clusters.WaitClusterToBeUpgraded(ctx.RancherClient, cluster.ID)
 				Expect(err).To(BeNil())
