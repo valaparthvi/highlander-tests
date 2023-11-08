@@ -1,6 +1,8 @@
 package helpers
 
 import (
+	"os"
+
 	. "github.com/onsi/gomega"
 	"github.com/rancher/rancher/tests/framework/clients/rancher"
 	management "github.com/rancher/rancher/tests/framework/clients/rancher/generated/management/v3"
@@ -9,10 +11,17 @@ import (
 	"github.com/rancher/rancher/tests/framework/extensions/cloudcredentials/azure"
 	"github.com/rancher/rancher/tests/framework/extensions/cloudcredentials/google"
 	"github.com/rancher/rancher/tests/framework/extensions/clusters"
+	"github.com/rancher/rancher/tests/framework/extensions/pipeline"
+	"github.com/rancher/rancher/tests/framework/pkg/config"
 	"github.com/rancher/rancher/tests/framework/pkg/session"
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	"github.com/rancher/rancher/tests/v2prov/defaults"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+var (
+	rancherPassword = os.Getenv("RANCHER_PASSWORD")
+	rancherhostname = os.Getenv("MY_HOSTNAME")
 )
 
 type Context struct {
@@ -22,10 +31,24 @@ type Context struct {
 }
 
 func CommonBeforeSuite(cloud string) Context {
+
+	rancherConfig := new(rancher.Config)
+	config.LoadConfig(rancher.ConfigurationFileKey, rancherConfig)
+
+	token, err := pipeline.CreateAdminToken(rancherPassword, rancherConfig)
+	Expect(err).To(BeNil())
+
+	rancherConfig.AdminToken = token
+	rancherConfig.Host = rancherhostname
+	config.UpdateConfig(rancher.ConfigurationFileKey, rancherConfig)
+
 	testSession := session.NewSession()
 	var cloudCredential *cloudcredentials.CloudCredential
 
 	rancherClient, err := rancher.NewClient("", testSession)
+	Expect(err).To(BeNil())
+
+	err = pipeline.PostRancherInstall(rancherClient, rancherPassword)
 	Expect(err).To(BeNil())
 
 	switch cloud {
