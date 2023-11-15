@@ -38,10 +38,7 @@ var _ = Describe("P0Importing", func() {
 			cluster, err = helpers.WaitUntilClusterIsReady(cluster, ctx.RancherClient)
 			Expect(err).To(BeNil())
 			// Workaround to add new Nodegroup till https://github.com/rancher/aks-operator/issues/251 is fixed
-			cluster, err = helper.AddNodeGroup(cluster, increaseBy, ctx.RancherClient)
-			Expect(err).To(BeNil())
-			err = clusters.WaitClusterToBeUpgraded(ctx.RancherClient, cluster.ID)
-			Expect(err).To(BeNil())
+			cluster.EKSConfig = cluster.EKSStatus.UpstreamSpec
 		})
 		AfterEach(func() {
 			err := helper.DeleteEKSHostCluster(cluster, ctx.RancherClient)
