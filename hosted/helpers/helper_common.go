@@ -13,6 +13,11 @@ import (
 	"github.com/rancher/rancher/tests/framework/pkg/wait"
 	"github.com/rancher/rancher/tests/v2prov/defaults"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"time"
+)
+
+const (
+	Timeout = 30 * time.Minute
 )
 
 type Context struct {

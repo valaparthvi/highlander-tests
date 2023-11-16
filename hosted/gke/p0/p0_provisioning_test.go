@@ -52,14 +52,13 @@ var _ = Describe("P0Provisioning", func() {
 			})
 
 			By("checking all management nodes are ready", func() {
-				err := nodestat.AllManagementNodeReady(ctx.RancherClient, cluster.ID)
+				err := nodestat.AllManagementNodeReady(ctx.RancherClient, cluster.ID, helpers.Timeout)
 				Expect(err).To(BeNil())
 			})
 
 			By("checking all pods are ready", func() {
-				podResults, errs := pods.StatusPods(ctx.RancherClient, cluster.ID)
-				Expect(errs).To(BeEmpty())
-				Expect(podResults).ToNot(BeEmpty())
+				podErrors := pods.StatusPods(ctx.RancherClient, cluster.ID)
+				Expect(podErrors).To(BeEmpty())
 			})
 
 		})
