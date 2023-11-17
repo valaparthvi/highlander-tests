@@ -51,9 +51,7 @@ func DeleteAKSHostCluster(cluster *management.Cluster, client *rancher.Client) e
 }
 
 func ListSingleVariantAKSAvailableVersions(client *rancher.Client, cloudCredentialID, region string) (availableVersions []string, err error) {
-	// TODO: passing a cluster is a temporary workaround until https://github.com/rancher/rancher/pull/43034 is merged
-	cluster := &management.Cluster{AKSConfig: &management.AKSClusterConfigSpec{AzureCredentialSecret: cloudCredentialID, ResourceLocation: region}}
-	availableVersions, err = kubernetesversions.ListAKSAllVersions(client, cluster)
+	availableVersions, err = kubernetesversions.ListAKSAllVersions(client, cloudCredentialID, region)
 	if err != nil {
 		return nil, err
 	}
