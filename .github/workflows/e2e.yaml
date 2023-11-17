@@ -112,12 +112,14 @@ jobs:
       RANCHER_USER: admin
       RANCHER_PASSWORD: rancherpassword
       RANCHER_URL: https://${{ needs.installation.outputs.MY_HOSTNAME }}/dashboard
-      shell: bash
-      run: |
-        export CATTLE_TEST_CONFIG=cattle-config-imp.yaml
-        make testi
-        export CATTLE_TEST_CONFIG=cattle-config-prov.yaml
-        make testp
+    steps:
+      - name: Tests
+        shell: bash
+        run: |
+          export CATTLE_TEST_CONFIG=cattle-config-imp.yaml
+          make testi
+          export CATTLE_TEST_CONFIG=cattle-config-prov.yaml
+          make testp
 
   # delete-cluster:
   #   if: always()
