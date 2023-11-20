@@ -33,6 +33,11 @@ jobs:
   installation:
     runs-on: self-hosted
     steps:
+      - name: Setup GCP Instance
+        uses: mattes/gce-deploy-action@v5
+        with:
+          creds: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}
+
       - name: Checkout
         uses: actions/checkout@v3
         with:
