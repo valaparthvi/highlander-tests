@@ -1,7 +1,11 @@
 # This workflow is a reusable one called by other workflows
 name: E2E workflow
-
 on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - edited
   workflow_dispatch:
   # Variables to set when calling this reusable workflow
     inputs:
