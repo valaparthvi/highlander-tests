@@ -29,7 +29,7 @@ install-rancher: ## Install Rancher via Helm
 		--namespace cattle-system \
 		--create-namespace \
 		--set global.cattle.psp.enabled=false \
-		--set hostname=${MY_HOSTNAME} \
+		--set hostname=${PUBLIC_DNS} \
 		--set bootstrapPassword=rancherpassword \
 		--set replicas=1 \
 		--set rancherImageTag=v${RANCHER_VERSION} \

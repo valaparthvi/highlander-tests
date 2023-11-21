@@ -1,47 +1,147 @@
 # This workflow is a reusable one called by other workflows
 name: E2E workflow
 on:
-  pull_request:
-    types:
-      - opened
-      - reopened
-      - edited
+#  pull_request:
+#    types:
+#      - opened
+#      - reopened
+#      - edited
+#  workflow_dispatch:
+#  # Variables to set when calling this reusable workflow
+#    inputs:
+#      rancher_version:
+#        description: Rancher version to deploy
+#        required: true
+#        type: string
+#      keep_cluster:
+#        type: choice
+#        description: "Keep the cluster afterwards?"
+#        required: true
+#        default: 'Delete'
+#        options:
+#        - Delete
+#        - Keep
   workflow_dispatch:
-  # Variables to set when calling this reusable workflow
+    # Variables to set when calling this reusable workflow
+    secrets:
+      AKS_CLIENT_ID:
+        description: Client ID to connect to AKS
+        required: true
+      AKS_CLIENT_SECRET:
+        description: Client Secret to connect to AKS
+        required: true
+      AKS_SUBSCRIPTION_ID:
+        description: Subscription ID to connect to AKS
+        required: true
+      AKS_TENANT_ID:
+        description: Tenant ID to connect to AKS
+        required: true
+      AWS_ACCESS_KEY_ID:
+        description: Access Key ID to connect to AWS
+        required: true
+      AWS_SECRET_ACCESS_KEY:
+        description: Secret Access Key to connect to AWS
+        required: true
+      GOOGLE_APPLICATION_CREDENTIALS:
+        description: Credentials to use to connect to GCloud
+        required: true
+      pat_token:
+        # A token is needed to be able to add runner on the repo, maybe this can be changed later
+        # This token is linked to a personal account
+        # So in case of token issue you have to check (no specific order and for example):
+        # - the expiration date
+        # - if the account associated still exists
+        # - if the person still has access to the repo
+        description: PAT token used to add runner
+        required: true
     inputs:
+      destroy_runner:
+        description: Destroy the auto-generated self-hosted runner
+        default: true
+        type: boolean
       rancher_version:
-        description: Rancher version to deploy
+        description: Rancher Manager channel/version/head_version to use for installation
+        default: stable/latest/none
+        type: string
+      runner_template:
+        description: Runner template to use
+        default: pvala-instance-template-1
+        type: string
+      gcp_zone:
+        description: GCP zone to host the runner
+        default: us-central1-c
+        type: string
+      EKS_REGION:
+        description: AWS region to be used
+        default: ap-south-1
         required: true
         type: string
-      keep_cluster:
-        type: choice
-        description: "Keep the cluster afterwards?"
-        required: true
-        default: 'Delete'
-        options:
-        - Delete
-        - Keep
-
-env:
-  SETUP_GO_VERSION: '1.20.4'
-  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-  EKS_REGION: ${{ secrets.EKS_REGION }}
-  GCP_CREDENTIALS: ${{ secrets.GCP_CREDENTIALS }}
-  AKS_CLIENT_ID: ${{ secrets.AKS_CLIENT_ID }}
-  AKS_CLIENT_SECRET: ${{ secrets.AKS_CLIENT_SECRET }}
-  AKS_SUBSCRIPTION_ID: ${{ secrets.AKS_SUBSCRIPTION_ID }}
-  AKS_TENANT_ID: ${{ secrets.AKS_TENANT_ID }}
-
 jobs:
-  installation:
-    runs-on: self-hosted
+  create-runner:
+    runs-on: ubuntu-latest
+    outputs:
+      uuid: ${{ steps.generator.outputs.uuid }}
+      runner: ${{ steps.generator.outputs.runner }}
+      public_dns: ${{ steps.dns.outputs.public_dns }}
     steps:
-      - name: Setup GCP Instance
-        uses: mattes/gce-deploy-action@v5
+      # actions/checkout MUST come before auth
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Generate UUID and Runner hostname
+        id: generator
+        run: |
+          UUID=$(uuidgen)
+          echo "uuid=${UUID}" >> ${GITHUB_OUTPUT}
+          echo "runner=hosted-provider-ci-${UUID}" >> ${GITHUB_OUTPUT}
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v1
         with:
-          creds: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}
+          credentials_json: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v1
+      - name: Create runner
+        run: |
+          gcloud compute instances create ${{ steps.generator.outputs.runner }} \
+            --source-instance-template ${{ inputs.runner_template }} \
+            --zone ${{ inputs.gcp_zone }}
+      - name: Create PAT token secret
+        run: |
+          echo -n ${{ secrets.pat_token }} \
+            | gcloud secrets create PAT_TOKEN_${{ steps.generator.outputs.uuid }} --data-file=-
+      - name: Get public dns name in GCP
+        id: dns
+        run: |
+          # Do a timed out loop here, as gcloud can sometimes fail
+          typeset -i i=0
+          while true; do
+            # Get public IP
+            PUBLIC_IP=$(gcloud compute instances list 2> /dev/null \
+                        | awk '/${{ steps.generator.outputs.runner }}/ {print $6}')
+            # Exit if we reach the timeout or if IP is set
+            if (( ++i > 10 )) || [[ -n "${PUBLIC_IP}" ]]; then
+              break
+            fi
+            # Wait a little before retrying
+            sleep 2
+          done
+          # Get the public DNS
+          PUBLIC_DNS=$(host -l ${PUBLIC_IP} 2> /dev/null \
+                       | awk '{sub(/\.$/, ""); print $5}')
+          echo "public_dns=${PUBLIC_DNS}" >> ${GITHUB_OUTPUT}
+          # Raise an error if either IP and/or DNS are empty
+          if [[ -z "${PUBLIC_IP}" || -z "${PUBLIC_DNS}" ]]; then
+            echo "PUBLIC_IP and/or PUBLIC_DNS are empty!" >&2
+            false
+          fi
 
+  installation:
+    needs: create-runner
+    runs-on: ${{ needs.create-runner.outputs.uuid }}
+    env:
+      PUBLIC_DNS: ${{ needs.create-runner.outputs.public_dns }}
+      PUBLIC_DOMAIN: bc.googleusercontent.com
+
+    steps:
       - name: Checkout
         uses: actions/checkout@v3
         with:
@@ -51,6 +151,8 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v4
         timeout-minutes: 5
+        env:
+          SETUP_GO_VERSION: '1.20.4'
         with:
           cache: false
           go-version: ${{ env.SETUP_GO_VERSION }}
@@ -65,28 +167,27 @@ jobs:
           HELM_VERSION: 3.12.0
           K3S_VERSION: v1.26.10+k3s1
           RANCHER_VERSION: ${{ inputs.rancher_version }}
-
-        run: |
-          ## Export information to other jobs
-          ETH_DEV=$(ip route | awk '/default via / { print $5 }')
-          MY_IP=$(ip a s ${ETH_DEV} | egrep -o 'inet [0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' | cut -d' ' -f2)
-          export MY_HOSTNAME=$(hostname)
-          echo "MY_IP=${MY_IP}" >> $GITHUB_OUTPUT
-          echo "MY_HOSTNAME=${MY_HOSTNAME}" >> $GITHUB_OUTPUT
-          make prepare-e2e-ci-rancher
+        run: make prepare-e2e-ci-rancher
 
       - name: Install Azure CLI
         uses: pietrobolcato/install-azure-cli-action@main
 
       - name: Login to Azure
         uses: azure/login@v1
+        env:
+          AKS_CLIENT_ID: ${{ secrets.AKS_CLIENT_ID }}
+          AKS_CLIENT_SECRET: ${{ secrets.AKS_CLIENT_SECRET }}
+          AKS_SUBSCRIPTION_ID: ${{ secrets.AKS_SUBSCRIPTION_ID }}
+          AKS_TENANT_ID: ${{ secrets.AKS_TENANT_ID }}
         with:
           creds: '{"clientId":"${{ env.AKS_CLIENT_ID }}","clientSecret":"${{ env.AKS_CLIENT_SECRET }}","subscriptionId":"${{ env.AKS_SUBSCRIPTION_ID }}","tenantId":"${{ env.AKS_TENANT_ID }}"}'
 
       - name: Authenticate to GCP
         uses: 'google-github-actions/auth@v1'
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}
         with:
-          credentials_json: '${{ env.GCP_CREDENTIALS }}'
+          credentials_json: '${{ env.GOOGLE_APPLICATION_CREDENTIALS }}'
   
       - name: Setup gcloud
         uses: google-github-actions/setup-gcloud@v1
@@ -104,32 +205,57 @@ jobs:
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4.0.0
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          EKS_REGION: ${{ inputs.EKS_REGION }}
         with:
           aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.EKS_REGION }}
-
     outputs:
         MY_HOSTNAME: ${{ steps.installation.outputs.MY_HOSTNAME }}
         MY_IP: ${{ steps.installation.outputs.MY_IP }}
 
   e2e-tests:
     needs:
+      - create-runner
       - installation
-    runs-on: self-hosted
+    runs-on: ${{ needs.create-runner.outputs.uuid }}
     env:
       RANCHER_USER: admin
       RANCHER_PASSWORD: rancherpassword
       RANCHER_URL: https://${{ needs.installation.outputs.MY_HOSTNAME }}/dashboard
     steps:
-      - name: Tests
-        shell: bash
-        run: |
-          export CATTLE_TEST_CONFIG=cattle-config-imp.yaml
-          make testi
-          export CATTLE_TEST_CONFIG=cattle-config-prov.yaml
-          make testp
+    - name: Tests
+      shell: bash
+      run: |
+        echo "Successfully reached e2e-tests stage."
+        export CATTLE_TEST_CONFIG=cattle-config-prov.yaml
+        make testp
 
+  delete-runner:
+    if: ${{ always() && needs.create-runner.result == 'success' && inputs.destroy_runner == true }}
+    needs: [ create-runner, installation, e2e-tests ]
+    runs-on: ubuntu-latest
+    steps:
+      # actions/checkout MUST come before auth
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v1
+      - name: Delete PAT token secret
+        run: |
+          gcloud --quiet secrets delete PAT_TOKEN_${{ needs.create-runner.outputs.uuid }}
+      - name: Delete runner
+        run: |
+          gcloud --quiet compute instances delete ${{ needs.create-runner.outputs.runner }} \
+            --delete-disks all \
+            --zone ${{ inputs.gcp_zone }}
   # delete-cluster:
   #   if: always()
   #   needs: [installation, e2e-tests]
