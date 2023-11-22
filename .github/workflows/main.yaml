@@ -1,41 +1,193 @@
-name: Secrets and Environment Variables
-
+# This workflow is a reusable one called by other workflows
+name: E2E Tests workflow
 on:
-  workflow_dispatch
+  workflow_dispatch:
+  # Variables to set when calling this reusable workflow
+    inputs:
+      rancher_version:
+        description: Rancher version to deploy
+        required: true
+        type: string
+        default: v2.8-head
+      keep_cluster:
+        type: boolean
+        description: "Keep the cluster afterwards?"
+        required: true
+        default: false
+      destroy_runner:
+        description: Destroy the auto-generated self-hosted runner
+        default: true
+        type: boolean
+      runner_template:
+        description: Runner template to use
+        default: hosted-providers-e2e-ci-runner-spot-x86-64-template-v1
+        type: string
 
 jobs:
-  top-secret:
+  create-runner:
     runs-on: ubuntu-latest
-    env:
-      EKS_REGION: ${{ vars.GLOBAL_EKS_REGION }}
-
+    outputs:
+      uuid: ${{ steps.generator.outputs.uuid }}
+      runner: ${{ steps.generator.outputs.runner }}
+      public_dns: ${{ steps.dns.outputs.public_dns }}
     steps:
-      - name: Read a variable
-        run: echo "My APP_ID value is ${{ vars.GLOBAL_EKS_REGION }}"
-
-      - name: Tell me a secret!
-        run: echo "My existing secret is ${{ secrets.AWS_ACCESS_KEY_ID }}"
-      
-      - name: Unset secret
-        run: echo "My unknown secret is ${{ secrets.PAT_TOKEN }}"
-      
-      - name: Github stuff
-        run: echo "My Github repo is called ${{ github.repository }}"
-      
-      - name: Read an env variable
-        run: echo "My APP_ID value is ${{ env.EKS_REGION }} (also accessible as $MY_APP_ID)"
-
-      - uses: actions/checkout@v2
-      - name: Read the env from an external script
+      # actions/checkout MUST come before auth
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Generate UUID and Runner hostname
+        id: generator
         run: |
-            echo "I'm a custom script and I can read the env! APP_ID is $MY_APP_ID"
-  
-  top-secret-production:
-    runs-on: ubuntu-latest
-    environment: production
+          UUID=$(uuidgen)
+          echo "uuid=${UUID}" >> ${GITHUB_OUTPUT}
+          echo "runner=hosted-provider-ci-${UUID}" >> ${GITHUB_OUTPUT}
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v1
+      - name: Create runner
+        run: |
+          gcloud compute instances create ${{ steps.generator.outputs.runner }} \
+            --zone ${{ vars.GCP_ZONE }}
+      - name: Create PAT token secret
+        run: |
+          echo -n ${{ secrets.PAT_TOKEN }} \
+            | gcloud secrets create PAT_TOKEN_${{ steps.generator.outputs.uuid }} --data-file=-
+      - name: Get public dns name in GCP
+        id: dns
+        run: |
+          # Do a timed out loop here, as gcloud can sometimes fail
+          typeset -i i=0
+          while true; do
+            # Get public IP
+            PUBLIC_IP=$(gcloud compute instances list 2> /dev/null \
+                        | awk '/${{ steps.generator.outputs.runner }}/ {print $6}')
+            # Exit if we reach the timeout or if IP is set
+            if (( ++i > 10 )) || [[ -n "${PUBLIC_IP}" ]]; then
+              break
+            fi
+            # Wait a little before retrying
+            sleep 2
+          done
+          # Get the public DNS
+          PUBLIC_DNS=$(host -l ${PUBLIC_IP} 2> /dev/null \
+                       | awk '{sub(/\.$/, ""); print $5}')
+          echo "public_dns=${PUBLIC_DNS}" >> ${GITHUB_OUTPUT}
+          # Raise an error if either IP and/or DNS are empty
+          if [[ -z "${PUBLIC_IP}" || -z "${PUBLIC_DNS}" ]]; then
+            echo "PUBLIC_IP and/or PUBLIC_DNS are empty!" >&2
+            false
+          fi
+      - name: Print Public dns name is GCP
+        run: |
+                echo ${GITHUB_OUTPUT}
+
+  installation:
+    needs: create-runner
+    runs-on: ${{ needs.create-runner.outputs.uuid }}
     env:
-      APP_ID: ${{ vars.GLOBAL_EKS_REGION }}
+      PUBLIC_DNS: ${{ needs.create-runner.outputs.public_dns }}
+      PUBLIC_DOMAIN: bc.googleusercontent.com
 
     steps:
-      - name: Read a variable
-        run: echo "My APP_ID value in the production job is $APP_ID"
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        timeout-minutes: 5
+        env:
+          SETUP_GO_VERSION: '1.20.4'
+        with:
+          cache: false
+          go-version: ${{ env.SETUP_GO_VERSION }}
+  
+      - name: Setup Ginkgo Test Framework
+        run: go install github.com/onsi/ginkgo/v2/ginkgo
+
+      - name: Install K3s / Helm / Rancher
+        id: installation
+        env:
+          KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+          HELM_VERSION: 3.12.0
+          K3S_VERSION: v1.26.10+k3s1
+          RANCHER_VERSION: ${{ inputs.rancher_version }}
+        run: make prepare-e2e-ci-rancher
+
+      - name: Install Azure CLI
+        uses: pietrobolcato/install-azure-cli-action@main
+
+      - name: Login to Azure
+        uses: azure/login@v1
+        with:
+          creds: '{"clientId":"${{ secrets.AKS_CLIENT_ID }}","clientSecret":"${{ secrets.AKS_CLIENT_SECRET }}","subscriptionId":"${{ secrets.AKS_SUBSCRIPTION_ID }}","tenantId":"${{ secrets.AKS_TENANT_ID }}"}'
+
+      - name: Authenticate to GCP
+        uses: 'google-github-actions/auth@v1'
+        with:
+          credentials_json: '${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}'
+  
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v1
+        
+      - name: Install gcloud kubectl version
+        run: gcloud components install kubectl
+
+      - name: Install EKSCTL
+        run: |
+          # Better to always use the latest eksctl binary to avoid API version issue
+          EKSCTL_GH=https://github.com/weaveworks/eksctl/releases/latest/download
+          curl --location ${EKSCTL_GH}/eksctl_$(uname -s)_amd64.tar.gz | tar xz -C .
+          chmod +x eksctl
+          sudo mv eksctl /usr/local/bin
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4.0.0
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.EKS_REGION }}
+    outputs:
+        MY_HOSTNAME: ${{ steps.installation.outputs.MY_HOSTNAME }}
+        MY_IP: ${{ steps.installation.outputs.MY_IP }}
+
+  e2e-tests:
+    needs:
+      - create-runner
+      - installation
+    runs-on: ${{ needs.create-runner.outputs.uuid }}
+    env:
+      RANCHER_USER: admin
+      RANCHER_PASSWORD: rancherpassword
+      RANCHER_URL: https://${{ needs.installation.outputs.MY_HOSTNAME }}/dashboard
+    steps:
+    - name: Tests
+      run: echo "Successfully reached e2e-tests stage."
+
+  delete-runner:
+    if: ${{ always() && needs.create-runner.result == 'success' && inputs.destroy_runner == true }}
+    needs: [ create-runner, installation, e2e-tests ]
+    runs-on: ubuntu-latest
+    steps:
+      # actions/checkout MUST come before auth
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v1
+      - name: Delete PAT token secret
+        run: |
+          gcloud --quiet secrets delete PAT_TOKEN_${{ needs.create-runner.outputs.uuid }}
+      - name: Delete runner
+        run: |
+          gcloud --quiet compute instances delete ${{ needs.create-runner.outputs.runner }} \
+            --delete-disks all \
+            --zone ${{ vars.GCP_ZONE }}
+
