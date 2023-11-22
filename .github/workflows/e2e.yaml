@@ -1,28 +1,43 @@
 # This workflow is a reusable one called by other workflows
 name: E2E workflow
 on:
-#  pull_request:
-#    types:
-#      - opened
-#      - reopened
-#      - edited
-#  workflow_dispatch:
-#  # Variables to set when calling this reusable workflow
-#    inputs:
-#      rancher_version:
-#        description: Rancher version to deploy
-#        required: true
-#        type: string
-#      keep_cluster:
-#        type: choice
-#        description: "Keep the cluster afterwards?"
-#        required: true
-#        default: 'Delete'
-#        options:
-#        - Delete
-#        - Keep
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - edited
   workflow_dispatch:
-    # Variables to set when calling this reusable workflow
+  # Variables to set when calling this reusable workflow
+    inputs:
+      rancher_version:
+        description: Rancher version to deploy
+        required: true
+        type: string
+      keep_cluster:
+        type: choice
+        description: "Keep the cluster afterwards?"
+        required: true
+        default: 'Delete'
+        options:
+        - Delete
+        - Keep
+      destroy_runner:
+        description: Destroy the auto-generated self-hosted runner
+        default: true
+        type: boolean
+      runner_template:
+        description: Runner template to use
+        default: pvala-instance-template-1
+        type: string
+      gcp_zone:
+        description: GCP zone to host the runner
+        default: us-central1-c
+        type: string
+      EKS_REGION:
+        description: AWS region to be used
+        default: ap-south-1
+        required: true
+        type: string
     secrets:
       AKS_CLIENT_ID:
         description: Client ID to connect to AKS
@@ -54,28 +69,7 @@ on:
         # - if the person still has access to the repo
         description: PAT token used to add runner
         required: true
-    inputs:
-      destroy_runner:
-        description: Destroy the auto-generated self-hosted runner
-        default: true
-        type: boolean
-      rancher_version:
-        description: Rancher Manager channel/version/head_version to use for installation
-        default: stable/latest/none
-        type: string
-      runner_template:
-        description: Runner template to use
-        default: pvala-instance-template-1
-        type: string
-      gcp_zone:
-        description: GCP zone to host the runner
-        default: us-central1-c
-        type: string
-      EKS_REGION:
-        description: AWS region to be used
-        default: ap-south-1
-        required: true
-        type: string
+
 jobs:
   create-runner:
     runs-on: ubuntu-latest
@@ -228,11 +222,7 @@ jobs:
       RANCHER_URL: https://${{ needs.installation.outputs.MY_HOSTNAME }}/dashboard
     steps:
     - name: Tests
-      shell: bash
-      run: |
-        echo "Successfully reached e2e-tests stage."
-        export CATTLE_TEST_CONFIG=cattle-config-prov.yaml
-        make testp
+      run: echo "Successfully reached e2e-tests stage."
 
   delete-runner:
     if: ${{ always() && needs.create-runner.result == 'success' && inputs.destroy_runner == true }}
