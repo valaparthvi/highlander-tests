@@ -49,7 +49,8 @@ jobs:
       - name: Create runner
         run: |
           gcloud compute instances create ${{ steps.generator.outputs.runner }} \
-            --zone ${{ vars.GCP_ZONE }}
+            --zone ${{ vars.GCP_ZONE }} \
+            --source-instance-template ${{ inputs.runner_template }}
       - name: Create PAT token secret
         run: |
           echo -n ${{ secrets.PAT_TOKEN }} \
@@ -81,7 +82,9 @@ jobs:
           fi
       - name: Print Public dns name is GCP
         run: |
-                echo ${GITHUB_OUTPUT}
+          echo ${{ needs.create-runner.outputs.public_dns }}
+          echo ${PUBLIC_DNS}
+          echo ${{ needs.create-runner.outputs.uuid }} 
 
   installation:
     needs: create-runner
