@@ -1,5 +1,5 @@
 # This workflow is a reusable one called by other workflows
-name: E2E workflow
+name: E2E Tests workflow
 on:
   pull_request:
     types:
@@ -78,6 +78,11 @@ jobs:
       runner: ${{ steps.generator.outputs.runner }}
       public_dns: ${{ steps.dns.outputs.public_dns }}
     steps:
+      - name: Ensure secrets are exported
+        run: |
+          echo ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}
+          echo ${{ env.EKS_REGION }}
+          echo ${{ secrets.pat_token }}
       # actions/checkout MUST come before auth
       - name: Checkout
         uses: actions/checkout@v3
