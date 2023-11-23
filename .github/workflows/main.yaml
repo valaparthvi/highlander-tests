@@ -86,53 +86,56 @@ jobs:
           echo ${PUBLIC_DNS}
           echo ${{ needs.create-runner.outputs.uuid }} 
 
-  installation:
-    needs: create-runner
-    runs-on: ${{ needs.create-runner.outputs.uuid }}
+  e2e-tests:
     env:
-      PUBLIC_DNS: ${{ needs.create-runner.outputs.public_dns }}
-      PUBLIC_DOMAIN: bc.googleusercontent.com
-
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      EKS_REGION: ${{ secrets.EKS_REGION }}
+      GCP_CREDENTIALS: ${{ secrets.GCP_CREDENTIALS }}
+      AKS_CLIENT_ID: ${{ secrets.AKS_CLIENT_ID }}
+      AKS_CLIENT_SECRET: ${{ secrets.AKS_CLIENT_SECRET }}
+      AKS_SUBSCRIPTION_ID: ${{ secrets.AKS_SUBSCRIPTION_ID }}
+      AKS_TENANT_ID: ${{ secrets.AKS_TENANT_ID }}
+      RANCHER_USER: admin
+      RANCHER_PASSWORD: rancherpassword
+    needs:  create-runner
+    runs-on: ${{ needs.create-runner.outputs.uuid }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
-        with:
-          submodules: recursive
-          fetch-depth: 0
+        uses: actions/checkout@v4
 
-      - name: Setup Go
-        uses: actions/setup-go@v4
-        timeout-minutes: 5
-        env:
-          SETUP_GO_VERSION: '1.20.4'
+      - name: Install Go
+        uses: actions/setup-go@v3
         with:
-          cache: false
-          go-version: ${{ env.SETUP_GO_VERSION }}
-  
-      - name: Setup Ginkgo Test Framework
-        run: go install github.com/onsi/ginkgo/v2/ginkgo
+          go-version-file: go.mod
+
+      - name: Get Runner IP
+        run: PUBLIC_IP=$(curl -s ifconfig.co) >> "${GITHUB_ENV}"
 
       - name: Install K3s / Helm / Rancher
-        id: installation
         env:
           KUBECONFIG: /etc/rancher/k3s/k3s.yaml
           HELM_VERSION: 3.12.0
           K3S_VERSION: v1.26.10+k3s1
           RANCHER_VERSION: ${{ inputs.rancher_version }}
-        run: make prepare-e2e-ci-rancher
+          RANCHER_HOSTNAME: ${{ env.PUBLIC_IP }}.sslip.io
+        run: |
+          make prepare-e2e-ci-rancher
 
-      - name: Install Azure CLI
-        uses: pietrobolcato/install-azure-cli-action@main
+      - name: Install Azure cli
+        run: |
+          sudo zypper install -y azure-cli
+          pip install azure-cli
 
       - name: Login to Azure
         uses: azure/login@v1
         with:
-          creds: '{"clientId":"${{ secrets.AKS_CLIENT_ID }}","clientSecret":"${{ secrets.AKS_CLIENT_SECRET }}","subscriptionId":"${{ secrets.AKS_SUBSCRIPTION_ID }}","tenantId":"${{ secrets.AKS_TENANT_ID }}"}'
+          creds: '{"clientId":"${{ env.AKS_CLIENT_ID }}","clientSecret":"${{ env.AKS_CLIENT_SECRET }}","subscriptionId":"${{ env.AKS_SUBSCRIPTION_ID }}","tenantId":"${{ env.AKS_TENANT_ID }}"}'
 
       - name: Authenticate to GCP
         uses: 'google-github-actions/auth@v1'
         with:
-          credentials_json: '${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}'
+          credentials_json: '${{ env.GCP_CREDENTIALS }}'
   
       - name: Setup gcloud
         uses: google-github-actions/setup-gcloud@v1
@@ -151,29 +154,15 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4.0.0
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ vars.EKS_REGION }}
-    outputs:
-        MY_HOSTNAME: ${{ steps.installation.outputs.MY_HOSTNAME }}
-        MY_IP: ${{ steps.installation.outputs.MY_IP }}
-
-  e2e-tests:
-    needs:
-      - create-runner
-      - installation
-    runs-on: ${{ needs.create-runner.outputs.uuid }}
-    env:
-      RANCHER_USER: admin
-      RANCHER_PASSWORD: rancherpassword
-      RANCHER_URL: https://${{ needs.installation.outputs.MY_HOSTNAME }}/dashboard
-    steps:
-    - name: Tests
-      run: echo "Successfully reached e2e-tests stage."
+          aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.EKS_REGION }}     
+      - name: Tests
+        run: echo "Successfully reached e2e-tests stage."
 
   delete-runner:
     if: ${{ always() && needs.create-runner.result == 'success' && inputs.destroy_runner == true }}
-    needs: [ create-runner, installation, e2e-tests ]
+    needs: [ create-runner, e2e-tests ]
     runs-on: ubuntu-latest
     steps:
       # actions/checkout MUST come before auth
