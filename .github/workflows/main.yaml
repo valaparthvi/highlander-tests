@@ -20,7 +20,7 @@ on:
         type: boolean
       runner_template:
         description: Runner template to use
-        default: hosted-providers-e2e-ci-runner-spot-x86-64-template-v1
+        default: hosted-providers-e2e-ci-runner-x86-64-template-v4
         type: string
 
 jobs:
@@ -39,7 +39,7 @@ jobs:
         run: |
           UUID=$(uuidgen)
           echo "uuid=${UUID}" >> ${GITHUB_OUTPUT}
-          echo "runner=hosted-provider-ci-${UUID}" >> ${GITHUB_OUTPUT}
+          echo "runner=hosted-providers-ci-${UUID}" >> ${GITHUB_OUTPUT}
       - name: Authenticate to GCP
         uses: google-github-actions/auth@v1
         with:
