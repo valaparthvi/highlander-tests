@@ -20,7 +20,7 @@ on:
         type: boolean
       runner_template:
         description: Runner template to use
-        default: hosted-providers-e2e-ci-runner-x86-64-template-v4
+        default: pvala-e2e-ci-runner-x86-64-template-v2
         type: string
 
 jobs:
