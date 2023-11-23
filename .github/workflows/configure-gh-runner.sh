@@ -10,7 +10,7 @@ VG_NAME=data
 GH_USER=gh-runner-highlander
 HOST_PREFIX="hosted-providers-ci-"
 HOST_PATTERN="^${HOST_PREFIX}[a-f0-9][a-f0-9]*-[a-f0-9][a-f0-9]*-[a-f0-9][a-f0-9]*-[a-f0-9][a-f0-9]*-[a-f0-9][a-f0-9]*\$"
-UNVALID_HOSTNAME=1
+INVALID_HOSTNAME=1
 GCLOUD_BIN=/opt/google-cloud-sdk/bin/gcloud
 declare -a NVME_DISK  # Force variable type to array
 
@@ -25,7 +25,7 @@ while (( SECONDS < SECONDS_TO_WAIT )); do
 
   # Break the loop if hostname matches the pattern
   if [[ "${HOSTNAME}" =~ ${HOST_PATTERN} ]]; then
-    UNVALID_HOSTNAME=0
+    INVALID_HOSTNAME=0
     break
   fi
 
@@ -34,7 +34,7 @@ while (( SECONDS < SECONDS_TO_WAIT )); do
 done
 
 # Continue only if hostname matches the pattern
-if (( UNVALID_HOSTNAME )); then
+if (( INVALID_HOSTNAME )); then
   # End script without error
   echo "$0: wrong hostname detected, not a runner! stopped"
   exit 0
@@ -68,7 +68,7 @@ chown -R ${GH_USER}:users /home/${GH_USER}
 # Install and configure GH runner (should be run with 'gh-runner' users)
 
 ## Generate registration token
-GH_REPO=rancher/hosted-providers-e2e
+GH_REPO=valaparthvi/highlander-tests
 TOKEN=$(curl \
           -X POST \
           -H "Accept: application/vnd.github+json" \
