@@ -118,7 +118,7 @@ jobs:
           HELM_VERSION: 3.12.0
           K3S_VERSION: v1.26.10+k3s1
           RANCHER_VERSION: ${{ inputs.rancher_version }}
-          RANCHER_HOSTNAME: ${{ env.PUBLIC_IP }}.sslip.io
+          RANCHER_HOSTNAME: ${{ env.PUBLIC_DNS }}
         run: |
           make prepare-e2e-ci-rancher
 
