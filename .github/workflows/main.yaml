@@ -8,7 +8,7 @@ on:
         description: Rancher version to deploy
         required: true
         type: string
-        default: v2.8-head
+        default: 2.8-head
       keep_cluster:
         type: boolean
         description: "Keep the cluster afterwards?"
@@ -29,7 +29,7 @@ jobs:
     outputs:
       uuid: ${{ steps.generator.outputs.uuid }}
       runner: ${{ steps.generator.outputs.runner }}
-      public_dns: ${{ steps.dns.outputs.public_dns }}
+      # public_dns: ${{ steps.dns.outputs.public_dns }}
     steps:
       # actions/checkout MUST come before auth
       - name: Checkout
@@ -55,43 +55,38 @@ jobs:
         run: |
           echo -n ${{ secrets.PAT_TOKEN }} \
             | gcloud secrets create PAT_TOKEN_${{ steps.generator.outputs.uuid }} --data-file=-
-      - name: Get public dns name in GCP
-        id: dns
-        run: |
-          # Do a timed out loop here, as gcloud can sometimes fail
-          typeset -i i=0
-          while true; do
-            # Get public IP
-            PUBLIC_IP=$(gcloud compute instances list 2> /dev/null \
-                        | awk '/${{ steps.generator.outputs.runner }}/ {print $6}')
-            # Exit if we reach the timeout or if IP is set
-            if (( ++i > 10 )) || [[ -n "${PUBLIC_IP}" ]]; then
-              break
-            fi
-            # Wait a little before retrying
-            sleep 2
-          done
-          # Get the public DNS
-          PUBLIC_DNS=$(host -l ${PUBLIC_IP} 2> /dev/null \
-                       | awk '{sub(/\.$/, ""); print $5}')
-          echo "public_dns=${PUBLIC_DNS}" >> ${GITHUB_OUTPUT}
-          # Raise an error if either IP and/or DNS are empty
-          if [[ -z "${PUBLIC_IP}" || -z "${PUBLIC_DNS}" ]]; then
-            echo "PUBLIC_IP and/or PUBLIC_DNS are empty!" >&2
-            false
-          fi
-      - name: Print Public dns name is GCP
-        run: |
-          echo ${{ needs.create-runner.outputs.public_dns }}
-          echo ${PUBLIC_DNS}
-          echo ${{ needs.create-runner.outputs.uuid }} 
+      # - name: Get public dns name in GCP
+      #   id: dns
+      #   run: |
+      #     # Do a timed out loop here, as gcloud can sometimes fail
+      #     typeset -i i=0
+      #     while true; do
+      #       # Get public IP
+      #       PUBLIC_IP=$(gcloud compute instances list 2> /dev/null \
+      #                   | awk '/${{ steps.generator.outputs.runner }}/ {print $6}')
+      #       # Exit if we reach the timeout or if IP is set
+      #       if (( ++i > 10 )) || [[ -n "${PUBLIC_IP}" ]]; then
+      #         break
+      #       fi
+      #       # Wait a little before retrying
+      #       sleep 2
+      #     done
+      #     # Get the public DNS
+      #     PUBLIC_DNS=$(host -l ${PUBLIC_IP} 2> /dev/null \
+      #                  | awk '{sub(/\.$/, ""); print $5}')
+      #     echo "public_dns=${PUBLIC_DNS}" >> ${GITHUB_OUTPUT}
+      #     # Raise an error if either IP and/or DNS are empty
+      #     if [[ -z "${PUBLIC_IP}" || -z "${PUBLIC_DNS}" ]]; then
+      #       echo "PUBLIC_IP and/or PUBLIC_DNS are empty!" >&2
+      #       false
+      #     fi
 
   e2e-tests:
     env:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      EKS_REGION: ${{ secrets.EKS_REGION }}
-      GCP_CREDENTIALS: ${{ secrets.GCP_CREDENTIALS }}
+      EKS_REGION: ${{ vars.EKS_REGION }}
+      GCP_CREDENTIALS: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}
       AKS_CLIENT_ID: ${{ secrets.AKS_CLIENT_ID }}
       AKS_CLIENT_SECRET: ${{ secrets.AKS_CLIENT_SECRET }}
       AKS_SUBSCRIPTION_ID: ${{ secrets.AKS_SUBSCRIPTION_ID }}
@@ -110,7 +105,7 @@ jobs:
           go-version-file: go.mod
 
       - name: Get Runner IP
-        run: PUBLIC_IP=$(curl -s ifconfig.co) >> "${GITHUB_ENV}"
+        run: echo "PUBLIC_IP=$(curl -s ifconfig.co)" >> ${GITHUB_ENV}
 
       - name: Install K3s / Helm / Rancher
         env:
@@ -118,7 +113,7 @@ jobs:
           HELM_VERSION: 3.12.0
           K3S_VERSION: v1.26.10+k3s1
           RANCHER_VERSION: ${{ inputs.rancher_version }}
-          RANCHER_HOSTNAME: ${{ env.PUBLIC_DNS }}
+          RANCHER_HOSTNAME: ${{ env.PUBLIC_IP }}.sslip.io
         run: |
           make prepare-e2e-ci-rancher
 
